@@ -1,0 +1,94 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel", "build"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "open-actuator"
+version = "0.1.0"
+description = "A control software for actuators with GUI interface"
+authors = [
+    {name = "Paul Hetherington", email = "contact@hlaboratories.com"}
+]
+maintainers = [
+    {name = "Paul Hetherington", email = "contact@hlaboratories.com"}
+]
+readme = "README.md"
+license = {text = "MIT"}
+keywords = ["actuator", "control", "gui", "serial", "usb", "motor"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Hardware :: Hardware Drivers",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "pyserial>=3.5",
+    "matplotlib>=3.5.0",
+    "numpy>=1.21.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "black>=22.0",
+    "flake8>=4.0",
+    "build>=0.8.0",
+    "twine>=4.0.0",
+]
+test = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/h-laboratories/open-actuator"
+Repository = "https://github.com/h-laboratories/open-actuator"
+Documentation = "https://github.com/h-laboratories/open-actuator#readme"
+"Bug Tracker" = "https://github.com/h-laboratories/open-actuator/issues"
+
+[project.scripts]
+open-actuator-gui = "open_actuator.main:main"
+open-actuator = "open_actuator.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"*" = ["*.txt", "*.md", "*.yml", "*.yaml"]
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+

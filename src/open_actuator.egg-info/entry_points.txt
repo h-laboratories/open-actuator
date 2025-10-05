@@ -1,0 +1,3 @@
+[console_scripts]
+open-actuator = open_actuator.main:main
+open-actuator-gui = open_actuator.main:main

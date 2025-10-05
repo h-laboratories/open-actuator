@@ -1,0 +1,16 @@
+include README.md
+include LICENSE
+include requirements.txt
+include pyproject.toml
+include setup.py
+include run_gui.py
+recursive-include src *.py
+recursive-include src *.md
+recursive-include src *.txt
+global-exclude *.pyc
+global-exclude __pycache__
+global-exclude .git*
+global-exclude .DS_Store
+global-exclude *.egg-info
+global-exclude build
+global-exclude dist

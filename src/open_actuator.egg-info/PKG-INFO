@@ -1,3 +1,51 @@
+Metadata-Version: 2.4
+Name: open-actuator
+Version: 0.1.0
+Summary: A control software for actuators with GUI interface
+Home-page: https://github.com/h-laboratories/open-actuator
+Author: Paul Hetherington
+Author-email: Paul Hetherington <contact@hlaboratories.com>
+Maintainer-email: Paul Hetherington <contact@hlaboratories.com>
+License: MIT
+Project-URL: Homepage, https://github.com/h-laboratories/open-actuator
+Project-URL: Repository, https://github.com/h-laboratories/open-actuator
+Project-URL: Documentation, https://github.com/h-laboratories/open-actuator#readme
+Project-URL: Bug Tracker, https://github.com/h-laboratories/open-actuator/issues
+Keywords: actuator,control,gui,serial,usb,motor
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: Science/Research
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Topic :: Scientific/Engineering
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: Topic :: System :: Hardware :: Hardware Drivers
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: pyserial>=3.5
+Requires-Dist: matplotlib>=3.5.0
+Requires-Dist: numpy>=1.21.0
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0; extra == "dev"
+Requires-Dist: black>=22.0; extra == "dev"
+Requires-Dist: flake8>=4.0; extra == "dev"
+Requires-Dist: build>=0.8.0; extra == "dev"
+Requires-Dist: twine>=4.0.0; extra == "dev"
+Provides-Extra: test
+Requires-Dist: pytest>=7.0; extra == "test"
+Requires-Dist: pytest-cov>=4.0; extra == "test"
+Dynamic: author
+Dynamic: home-page
+Dynamic: license-file
+Dynamic: requires-python
+
 # Open Actuator
 
 A comprehensive control software for actuators with a modern GUI interface. This software provides real-time control and monitoring of actuators over USB serial communication.
