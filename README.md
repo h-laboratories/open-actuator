@@ -1,15 +1,35 @@
 # Open Actuator
 
-A comprehensive control software for actuators with a modern GUI interface. This software provides real-time control and monitoring of actuators over USB serial communication.
+A communication protocol for actuators with a simple to use library for control. It's easily expandable for custom actuator control.
+
+Here's a basic example for controlling an FOC controller:
+
+```python
+
+import time
+
+from open_actuator import ACBv2, USBInterface
+
+port = "/dev/ttyACM0"  # Change this to your port (e.g., "COM3" on Windows)
+baudrate = 2000000
+
+usb_interface = USBInterface(port, baudrate)
+actuator = ACBv2(usb_interface)
+
+actuator.connect()
+
+actuator.recalibrate_sensors()
+
+actuator.set_velocity(1000) # 1e3 deg/s
+    
+time.sleep(10)
+
+actuator.disconnect()
+
+```
+
 
 ## Features
-
-- **Modern GUI Interface**: Clean, intuitive graphical interface for actuator control
-- **Real-time Monitoring**: Live data visualization of position, velocity, and torque
-- **Multiple Communication Modes**: Support for human-readable, binary, and SimpleFOC protocols
-- **Cross-platform**: Works on Windows, macOS, and Linux
-- **USB Serial Communication**: Direct communication with actuator control boards
-- **Data Logging**: Built-in communication log and data export capabilities
 
 ## Installation
 
