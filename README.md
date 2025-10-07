@@ -108,32 +108,6 @@ The following table describes the variable types used in the commands:
 
 ## Development
 
-### Project Structure
-
-```
-src/open_actuator/
-├── __init__.py
-├── main.py                 # Main entry point
-├── actuator_interface.py   # Core actuator communication
-└── gui/
-    ├── __init__.py
-    ├── main.py            # Main GUI application
-    └── plotter.py         # Real-time data plotting
-```
-
-### Running Tests
-
-```bash
-pytest
-```
-
-### Code Formatting
-
-```bash
-black src/
-flake8 src/
-```
-
 ## Troubleshooting
 
 ### Connection Issues
@@ -142,6 +116,7 @@ flake8 src/
 - Check that the correct port is selected
 - Verify the baud rate matches your actuator's configuration
 - Try different USB ports or cables
+- Flip USB C around (sometimes oneside in certain cables doesn't attach to USB 2)
 
 ### GUI Issues
 
