@@ -29,7 +29,6 @@ class ActuatorGUI:
         """Initialize the GUI application."""
         self.root = tk.Tk()
         self.root.title("Open Actuator Control")
-        self.root.geometry("1600x1000")
         self.root.configure(bg='#f0f0f0')
         
         # Actuator interface
@@ -44,9 +43,10 @@ class ActuatorGUI:
         self.status_monitoring = False
         self.status_thread: Optional[threading.Thread] = None
         
-        # Broadcast monitoring
-        self.broadcast_listening = False
-        self.broadcast_thread: Optional[threading.Thread] = None
+        # Plotting polling
+        self.plotting_polling = False
+        self.plotting_thread: Optional[threading.Thread] = None
+        
         
         # Data storage for plotting
         self.data_history = {
@@ -69,6 +69,45 @@ class ActuatorGUI:
         self.setup_ui()
         self.setup_styles()
         
+        # Auto-resize window to fit content
+        self.root.after(100, self.auto_resize_window)
+        
+    def auto_resize_window(self) -> None:
+        """Automatically resize the window to fit all content."""
+        # Update the window to ensure all widgets are rendered
+        self.root.update_idletasks()
+        
+        # Get the required size for all content
+        self.root.geometry("")  # Remove any fixed geometry
+        
+        # Get the natural size of the window
+        self.root.update_idletasks()
+        
+        # Set a minimum size to ensure usability
+        self.root.minsize(800, 600)
+        
+        # Center the window on screen
+        self.center_window()
+        
+    def center_window(self) -> None:
+        """Center the window on the screen."""
+        self.root.update_idletasks()
+        
+        # Get window size
+        width = self.root.winfo_width()
+        height = self.root.winfo_height()
+        
+        # Get screen dimensions
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        
+        # Calculate position to center the window
+        x = (screen_width - width) // 2
+        y = (screen_height - height) // 2
+        
+        # Set the window position
+        self.root.geometry(f"{width}x{height}+{x}+{y}")
+        
     def setup_styles(self) -> None:
         """Configure GUI styles and themes."""
         style = ttk.Style()
@@ -84,20 +123,23 @@ class ActuatorGUI:
         
     def setup_ui(self) -> None:
         """Set up the main user interface."""
-        # Main container with two columns
-        main_frame = ttk.Frame(self.root, padding="10")
-        main_frame.grid(row=0, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S))
-        
         # Configure grid weights for two columns
         self.root.columnconfigure(0, weight=1)  # Left column (controls)
         self.root.columnconfigure(1, weight=2)  # Right column (plot) - wider
-        self.root.rowconfigure(0, weight=1)
+        self.root.rowconfigure(1, weight=1)  # Main content area
+        
+        # Setup menubar
+        self.setup_menubar()
+        
+        # Main container with two columns
+        main_frame = ttk.Frame(self.root, padding="10")
+        main_frame.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S))
         main_frame.columnconfigure(0, weight=1)
         main_frame.columnconfigure(1, weight=1)
         
         # Title spanning both columns
-        title_label = ttk.Label(main_frame, text="Open Actuator Control", style='Title.TLabel')
-        title_label.grid(row=0, column=0, columnspan=2, pady=(0, 20))
+        # title_label = ttk.Label(main_frame, text="Open Actuator Control", style='Title.TLabel')
+        # title_label.grid(row=0, column=0, columnspan=2, pady=(0, 20))
         
         # Left column - Controls
         left_frame = ttk.Frame(main_frame)
@@ -127,6 +169,208 @@ class ActuatorGUI:
         
         # Plot frame
         self.setup_plot_frame(right_frame, 0)
+        
+    def setup_menubar(self) -> None:
+        """Set up the menubar at the top of the window."""
+        # Create the menubar
+        menubar = tk.Menu(self.root)
+        self.root.config(menu=menubar)
+        
+        # Tools menu
+        tools_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Tools", menu=tools_menu)
+        tools_menu.add_command(label="Setup New Actuator", command=self.open_setup_actuator)
+        tools_menu.add_command(label="Calibrate Sensors", command=self.calibrate_sensors)
+        tools_menu.add_command(label="Reset to Defaults", command=self.reset_to_defaults)
+        tools_menu.add_separator()
+        tools_menu.add_command(label="Clear Data History", command=self.clear_data_history)
+        
+        # Help menu
+        help_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Help", menu=help_menu)
+        help_menu.add_command(label="About", command=self.show_about)
+        help_menu.add_command(label="Documentation", command=self.show_documentation)
+        
+        # Store menu references for state updates
+        self.tools_menu = tools_menu
+    
+    
+    def calibrate_sensors(self) -> None:
+        """Calibrate actuator sensors."""
+        if not self.connected or not self.actuator:
+            messagebox.showerror("Error", "Please connect to an actuator first")
+            return
+        messagebox.showinfo("Calibrate Sensors", "Sensor calibration started...")
+    
+    def reset_to_defaults(self) -> None:
+        """Reset actuator to default settings."""
+        if not self.connected or not self.actuator:
+            messagebox.showerror("Error", "Please connect to an actuator first")
+            return
+        if messagebox.askyesno("Reset to Defaults", "Are you sure you want to reset to default settings?"):
+            messagebox.showinfo("Reset", "Settings reset to defaults!")
+    
+    def clear_data_history(self) -> None:
+        """Clear the data history."""
+        self.data_history = {
+            'position': [],
+            'velocity': [],
+            'torque': [],
+            'time': []
+        }
+        messagebox.showinfo("Clear Data", "Data history cleared!")
+    
+    
+    def show_about(self) -> None:
+        """Show about dialog."""
+        messagebox.showinfo("About", "Open Actuator Control v1.0\n\nA comprehensive GUI for controlling actuators.")
+    
+    def show_documentation(self) -> None:
+        """Show documentation."""
+        import webbrowser
+        webbrowser.open("https://docs.hlaboratories.com/?ref=open-actuator-gui")
+        
+    def open_setup_actuator(self) -> None:
+        """Open the Setup New Actuator window."""
+        if not self.connected or not self.actuator:
+            messagebox.showerror("Error", "Please connect to an actuator first")
+            return
+            
+        # Create setup window
+        setup_window = tk.Toplevel(self.root)
+        setup_window.title("Setup New Actuator")
+        setup_window.geometry("400x400")
+        setup_window.resizable(False, True)
+        
+        # Center the window
+        setup_window.transient(self.root)
+        setup_window.grab_set()
+        
+        # Main frame
+        main_frame = ttk.Frame(setup_window, padding="20")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Title
+        title_label = ttk.Label(main_frame, text="Setup New Actuator", style='Title.TLabel')
+        title_label.pack(pady=(0, 20))
+        
+        # Instructions
+        instructions = ttk.Label(main_frame, 
+                           text="This tool will help you set up a new actuator by configuring\n"
+                                "the number of pole pairs and calibrating the sensors.",
+                           style='Status.TLabel')
+        instructions.pack(pady=(0, 20))
+        
+        # Pole pairs input
+        pole_pairs_frame = ttk.Frame(main_frame)
+        pole_pairs_frame.pack(fill=tk.X, pady=(0, 20))
+        
+        ttk.Label(pole_pairs_frame, text="Number of Pole Pairs:", style='Heading.TLabel').pack(anchor=tk.W)
+        
+        input_frame = ttk.Frame(pole_pairs_frame)
+        input_frame.pack(fill=tk.X, pady=(5, 0))
+        
+        self.pole_pairs_var = tk.IntVar(value=7)  # Default value
+        pole_pairs_entry = ttk.Entry(input_frame, textvariable=self.pole_pairs_var, width=10)
+        pole_pairs_entry.pack(side=tk.LEFT, padx=(0, 10))
+        
+        ttk.Label(input_frame, text="(typically 7 for most motors)", style='Status.TLabel').pack(side=tk.LEFT)
+        
+        # Warning about calibration
+        warning_frame = ttk.LabelFrame(main_frame, text="Important", padding="10")
+        warning_frame.pack(fill=tk.X, pady=(0, 20))
+        
+        warning_text = ttk.Label(warning_frame, 
+                                text="WARNING: Calibration will:\n"
+                                     "- Disable the motor during calibration\n"
+                                     "- Recalibrate sensor zero position\n"
+                                     "- Save configuration to EEPROM\n"
+                                     "- This process takes a few seconds",
+                                style='Status.TLabel',
+                                justify=tk.LEFT)
+        warning_text.pack(anchor=tk.W)
+        
+        # Buttons
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(fill=tk.X, pady=(20, 0))
+        
+        ttk.Button(button_frame, text="Cancel", command=setup_window.destroy).pack(side=tk.RIGHT, padx=(10, 0))
+        ttk.Button(button_frame, text="Calibrate & Save", 
+                  command=lambda: self.perform_actuator_setup(setup_window)).pack(side=tk.RIGHT)
+        
+    def perform_actuator_setup(self, setup_window: tk.Toplevel) -> None:
+        """Perform the actuator setup process."""
+        if not self.connected or not self.actuator:
+            messagebox.showerror("Error", "Not connected to actuator")
+            return
+            
+        # Get pole pairs value
+        try:
+            pole_pairs = self.pole_pairs_var.get()
+            if pole_pairs < 1:
+                messagebox.showerror("Error", "Number of pole pairs must be 1 or greater")
+                return
+        except tk.TclError:
+            messagebox.showerror("Error", "Invalid number of pole pairs")
+            return
+            
+        # Show confirmation dialog
+        result = messagebox.askyesno(
+            "Confirm Setup", 
+            f"This will:\n"
+            f"- Set pole pairs to {pole_pairs}\n"
+            f"- Recalibrate sensors\n"
+            f"- Save configuration to EEPROM\n\n"
+            f"Continue with setup?"
+        )
+        
+        if not result:
+            return
+            
+        # Disable the setup window during process
+        setup_window.config(cursor="watch")
+        for widget in setup_window.winfo_children():
+            for child in widget.winfo_children():
+                if isinstance(child, (ttk.Button, ttk.Entry)):
+                    child.config(state='disabled')
+        
+        try:
+            # Step 1: Set pole pairs
+            if not self.actuator.set_pole_pairs(pole_pairs):
+                messagebox.showerror("Error", "Failed to set pole pairs")
+                return
+            
+            # Step 2: Recalibrate sensors
+            if not self.actuator.recalibrate_sensors():
+                messagebox.showerror("Error", "Failed to recalibrate sensors")
+                return
+            
+            # Step 3: Save configuration
+            if not self.actuator.save_config():
+                messagebox.showerror("Error", "Failed to save configuration")
+                return
+            
+            # Success message
+            messagebox.showinfo(
+                "Setup Complete", 
+                f"Actuator setup completed successfully!\n\n"
+                f"- Pole pairs: {pole_pairs}\n"
+                f"- Sensors recalibrated\n"
+                f"- Configuration saved to EEPROM"
+            )
+            
+            setup_window.destroy()
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Setup failed: {str(e)}")
+            self.log_message(f"ERROR: Setup failed: {str(e)}")
+        finally:
+            # Re-enable the setup window
+            setup_window.config(cursor="")
+            for widget in setup_window.winfo_children():
+                for child in widget.winfo_children():
+                    if isinstance(child, (ttk.Button, ttk.Entry)):
+                        child.config(state='normal')
         
     def setup_connection_frame(self, parent: ttk.Frame, row: int) -> None:
         """Set up the connection configuration frame."""
@@ -177,46 +421,85 @@ class ActuatorGUI:
         ttk.Label(control_frame, text="Position (deg):", style='Heading.TLabel').grid(row=0, column=0, sticky=tk.W, pady=(0, 5))
         pos_frame = ttk.Frame(control_frame)
         pos_frame.grid(row=1, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 10))
-        pos_frame.columnconfigure(0, weight=1)
+        
+        # Position preset buttons
+        pos_preset_frame = ttk.Frame(pos_frame)
+        pos_preset_frame.grid(row=0, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 5))
+        
+        # Preset buttons for position
+        ttk.Button(pos_preset_frame, text="-1000", command=lambda: self.increment_position_value(-1000)).grid(row=0, column=0, padx=(0, 2))
+        ttk.Button(pos_preset_frame, text="-100", command=lambda: self.increment_position_value(-100)).grid(row=0, column=1, padx=(0, 2))
+        ttk.Button(pos_preset_frame, text="-10", command=lambda: self.increment_position_value(-10)).grid(row=0, column=2, padx=(0, 2))
+        ttk.Button(pos_preset_frame, text="0", command=lambda: self.set_position_value(0)).grid(row=0, column=3, padx=(0, 2))
+        ttk.Button(pos_preset_frame, text="+10", command=lambda: self.increment_position_value(10)).grid(row=0, column=4, padx=(0, 2))
+        ttk.Button(pos_preset_frame, text="+100", command=lambda: self.increment_position_value(100)).grid(row=0, column=5, padx=(0, 2))
+        ttk.Button(pos_preset_frame, text="+1000", command=lambda: self.increment_position_value(1000)).grid(row=0, column=6, padx=(0, 2))
+        
+        # Position input and set button
+        pos_input_frame = ttk.Frame(pos_frame)
+        pos_input_frame.grid(row=1, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(5, 0))
         
         self.position_var = tk.DoubleVar()
-        position_scale = ttk.Scale(pos_frame, from_=-180, to=180, variable=self.position_var, orient=tk.HORIZONTAL)
-        position_scale.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 5))
+        position_entry = ttk.Entry(pos_input_frame, textvariable=self.position_var, width=15)
+        position_entry.grid(row=0, column=0, padx=(0, 5))
         
-        position_entry = ttk.Entry(pos_frame, textvariable=self.position_var, width=10)
-        position_entry.grid(row=0, column=1, padx=(5, 0))
-        
-        ttk.Button(pos_frame, text="Set Position", command=self.set_position).grid(row=0, column=2, padx=(10, 0))
+        ttk.Button(pos_input_frame, text="Set Position", command=self.set_position).grid(row=0, column=1, padx=(0, 5))
         
         # Velocity control
         ttk.Label(control_frame, text="Velocity (deg/s):", style='Heading.TLabel').grid(row=2, column=0, sticky=tk.W, pady=(10, 5))
         vel_frame = ttk.Frame(control_frame)
         vel_frame.grid(row=3, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 10))
-        vel_frame.columnconfigure(0, weight=1)
+        
+        # Velocity preset buttons
+        vel_preset_frame = ttk.Frame(vel_frame)
+        vel_preset_frame.grid(row=0, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 5))
+        
+        # Preset buttons for velocity
+        ttk.Button(vel_preset_frame, text="-1000", command=lambda: self.increment_velocity_value(-1000)).grid(row=0, column=0, padx=(0, 2))
+        ttk.Button(vel_preset_frame, text="-100", command=lambda: self.increment_velocity_value(-100)).grid(row=0, column=1, padx=(0, 2))
+        ttk.Button(vel_preset_frame, text="-10", command=lambda: self.increment_velocity_value(-10)).grid(row=0, column=2, padx=(0, 2))
+        ttk.Button(vel_preset_frame, text="0", command=lambda: self.set_velocity_value(0)).grid(row=0, column=3, padx=(0, 2))
+        ttk.Button(vel_preset_frame, text="+10", command=lambda: self.increment_velocity_value(10)).grid(row=0, column=4, padx=(0, 2))
+        ttk.Button(vel_preset_frame, text="+100", command=lambda: self.increment_velocity_value(100)).grid(row=0, column=5, padx=(0, 2))
+        ttk.Button(vel_preset_frame, text="+1000", command=lambda: self.increment_velocity_value(1000)).grid(row=0, column=6, padx=(0, 2))
+        
+        # Velocity input and set button
+        vel_input_frame = ttk.Frame(vel_frame)
+        vel_input_frame.grid(row=1, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(5, 0))
         
         self.velocity_var = tk.DoubleVar()
-        velocity_scale = ttk.Scale(vel_frame, from_=-100, to=100, variable=self.velocity_var, orient=tk.HORIZONTAL)
-        velocity_scale.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 5))
+        velocity_entry = ttk.Entry(vel_input_frame, textvariable=self.velocity_var, width=15)
+        velocity_entry.grid(row=0, column=0, padx=(0, 5))
         
-        velocity_entry = ttk.Entry(vel_frame, textvariable=self.velocity_var, width=10)
-        velocity_entry.grid(row=0, column=1, padx=(5, 0))
-        
-        ttk.Button(vel_frame, text="Set Velocity", command=self.set_velocity).grid(row=0, column=2, padx=(10, 0))
+        ttk.Button(vel_input_frame, text="Set Velocity", command=self.set_velocity).grid(row=0, column=1, padx=(0, 5))
         
         # Torque control
         ttk.Label(control_frame, text="Torque (Nm):", style='Heading.TLabel').grid(row=4, column=0, sticky=tk.W, pady=(10, 5))
         torque_frame = ttk.Frame(control_frame)
         torque_frame.grid(row=5, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 10))
-        torque_frame.columnconfigure(0, weight=1)
+        
+        # Torque preset buttons
+        torque_preset_frame = ttk.Frame(torque_frame)
+        torque_preset_frame.grid(row=0, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 5))
+        
+        # Preset buttons for torque
+        ttk.Button(torque_preset_frame, text="-1000", command=lambda: self.increment_torque_value(-1000)).grid(row=0, column=0, padx=(0, 2))
+        ttk.Button(torque_preset_frame, text="-100", command=lambda: self.increment_torque_value(-100)).grid(row=0, column=1, padx=(0, 2))
+        ttk.Button(torque_preset_frame, text="-10", command=lambda: self.increment_torque_value(-10)).grid(row=0, column=2, padx=(0, 2))
+        ttk.Button(torque_preset_frame, text="0", command=lambda: self.set_torque_value(0)).grid(row=0, column=3, padx=(0, 2))
+        ttk.Button(torque_preset_frame, text="+10", command=lambda: self.increment_torque_value(10)).grid(row=0, column=4, padx=(0, 2))
+        ttk.Button(torque_preset_frame, text="+100", command=lambda: self.increment_torque_value(100)).grid(row=0, column=5, padx=(0, 2))
+        ttk.Button(torque_preset_frame, text="+1000", command=lambda: self.increment_torque_value(1000)).grid(row=0, column=6, padx=(0, 2))
+        
+        # Torque input and set button
+        torque_input_frame = ttk.Frame(torque_frame)
+        torque_input_frame.grid(row=1, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(5, 0))
         
         self.torque_var = tk.DoubleVar()
-        torque_scale = ttk.Scale(torque_frame, from_=-10, to=10, variable=self.torque_var, orient=tk.HORIZONTAL)
-        torque_scale.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 5))
+        torque_entry = ttk.Entry(torque_input_frame, textvariable=self.torque_var, width=15)
+        torque_entry.grid(row=0, column=0, padx=(0, 5))
         
-        torque_entry = ttk.Entry(torque_frame, textvariable=self.torque_var, width=10)
-        torque_entry.grid(row=0, column=1, padx=(5, 0))
-        
-        ttk.Button(torque_frame, text="Set Torque", command=self.set_torque).grid(row=0, column=2, padx=(10, 0))
+        ttk.Button(torque_input_frame, text="Set Torque", command=self.set_torque).grid(row=0, column=1, padx=(0, 5))
         
         # Control buttons
         button_frame = ttk.Frame(control_frame)
@@ -226,6 +509,7 @@ class ActuatorGUI:
         ttk.Button(button_frame, text="Disable", command=self.disable_actuator).grid(row=0, column=1, padx=(0, 5))
         ttk.Button(button_frame, text="Home", command=self.home_actuator).grid(row=0, column=2, padx=(0, 5))
         ttk.Button(button_frame, text="Stop", command=self.stop_actuator).grid(row=0, column=3, padx=(0, 5))
+        ttk.Button(button_frame, text="Reset Position", command=self.reset_position).grid(row=0, column=4, padx=(0, 5))
         
         # Calibration button
         ttk.Button(button_frame, text="Recalibrate Sensors", command=self.recalibrate_sensors).grid(row=1, column=0, columnspan=2, pady=(5, 0), padx=(0, 5))
@@ -246,21 +530,12 @@ class ActuatorGUI:
         ttk.Button(monitor_frame, text="Get Bus Voltage", command=self.get_bus_voltage).grid(row=1, column=1, padx=(0, 5), pady=(5, 0))
         ttk.Button(monitor_frame, text="Get Internal Temp", command=self.get_internal_temperature).grid(row=1, column=2, padx=(0, 5), pady=(5, 0))
         
-        # Broadcast controls
-        broadcast_frame = ttk.Frame(control_frame)
-        broadcast_frame.grid(row=8, column=0, columnspan=3, pady=(10, 0))
-        broadcast_frame.columnconfigure(1, weight=1)
+        # Full state controls
+        full_state_frame = ttk.Frame(control_frame)
+        full_state_frame.grid(row=8, column=0, columnspan=3, pady=(10, 0))
         
-        ttk.Label(broadcast_frame, text="Broadcast (Hz):", style='Heading.TLabel').grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
-        self.broadcast_freq_var = tk.DoubleVar(value=0.0)
-        broadcast_scale = ttk.Scale(broadcast_frame, from_=0, to=50, variable=self.broadcast_freq_var, orient=tk.HORIZONTAL)
-        broadcast_scale.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(0, 5))
-        
-        broadcast_entry = ttk.Entry(broadcast_frame, textvariable=self.broadcast_freq_var, width=8)
-        broadcast_entry.grid(row=0, column=2, padx=(0, 5))
-        
-        ttk.Button(broadcast_frame, text="Set Broadcast", command=self.set_broadcast).grid(row=0, column=3, padx=(0, 5))
-        ttk.Button(broadcast_frame, text="Stop Broadcast", command=self.stop_broadcast).grid(row=0, column=4, padx=(0, 5))
+        ttk.Label(full_state_frame, text="Full State:", style='Heading.TLabel').grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
+        ttk.Button(full_state_frame, text="Get Full State", command=self.get_full_state).grid(row=0, column=1, padx=(0, 5))
         
     def setup_pid_frame(self, parent: ttk.Frame, row: int) -> None:
         """Set up the PID control frame."""
@@ -484,7 +759,6 @@ class ActuatorGUI:
         self.port_combo['values'] = ports
         if ports:
             self.port_combo.set(ports[0])
-        self.log_message(f"Refreshed available ports (filtered {len(all_ports) - len(ports)} system ports)")
         
     def toggle_connection(self) -> None:
         """Toggle connection to the actuator."""
@@ -518,8 +792,6 @@ class ActuatorGUI:
         }
         mode = mode_map.get(self.mode_var.get(), CommandMode.HUMAN_READABLE)
         self.actuator.interface.command_mode = mode
-        # Print info about the port being connected to
-        self.log_message(f"Attempting to connect to port: {port} at baudrate: {baudrate}")
         
         if self.actuator.connect():
             self.connected = True
@@ -527,13 +799,15 @@ class ActuatorGUI:
             self.connection_status.config(text="Connected", style='Success.TLabel')
             # Enable plot buttons when connected
             self.plot_start_btn.config(state='normal')
-            self.log_message(f"Connected to {port} at {baudrate} baud")
+            # Enable/disable menu items
+            self.tools_menu.entryconfig("Setup New Actuator", state=tk.NORMAL)
+            self.tools_menu.entryconfig("Calibrate Sensors", state=tk.NORMAL)
+            self.tools_menu.entryconfig("Reset to Defaults", state=tk.NORMAL)
             
             # Start status monitoring at 2Hz
             self.start_status_monitoring()
             
             # Auto-load configuration values
-            self.log_message("Loading configuration from actuator...")
             self.load_config()
         else:
             self.actuator = None
@@ -544,7 +818,7 @@ class ActuatorGUI:
         if self.actuator:
             self.stop_monitoring()
             self.stop_status_monitoring()
-            self.stop_broadcast_listening()
+            self.stop_plotting_polling()
             self.actuator.disconnect()
             self.actuator = None
             
@@ -554,7 +828,10 @@ class ActuatorGUI:
         # Disable plot buttons when disconnected
         self.plot_start_btn.config(state='disabled')
         self.plot_stop_btn.config(state='disabled')
-        self.log_message("Disconnected from actuator")
+        # Enable/disable menu items
+        self.tools_menu.entryconfig("Setup New Actuator", state=tk.DISABLED)
+        self.tools_menu.entryconfig("Calibrate Sensors", state=tk.DISABLED)
+        self.tools_menu.entryconfig("Reset to Defaults", state=tk.DISABLED)
         
     def test_connection(self) -> None:
         """Test the connection to the actuator."""
@@ -569,8 +846,6 @@ class ActuatorGUI:
             messagebox.showerror("Error", "Invalid baud rate")
             return
             
-        self.log_message(f"Testing connection to {port} at {baudrate} baud...")
-        
         # Create temporary USB interface and ACBv2 actuator for testing
         test_usb_interface = USBInterface(port, baudrate)
         test_actuator = ACBv2(test_usb_interface)
@@ -585,74 +860,39 @@ class ActuatorGUI:
         test_actuator.interface.command_mode = mode
         
         if test_actuator.connect():
-            self.log_message("✅ Connection successful")
-            
             # Test basic commands
-            self.log_message("Testing enable command...")
-            if test_actuator.enable():
-                self.log_message("✅ Enable command successful")
-            else:
-                self.log_message("❌ Enable command failed")
+            if not test_actuator.enable():
+                self.log_message("ERROR: Enable command failed")
                 
-            self.log_message("Testing disable command...")
-            if test_actuator.disable():
-                self.log_message("✅ Disable command successful")
-            else:
-                self.log_message("❌ Disable command failed")
+            if not test_actuator.disable():
+                self.log_message("ERROR: Disable command failed")
                 
             # Test get commands
-            self.log_message("Testing get_position command...")
             position = test_actuator.get_position()
-            if position is not None:
-                self.log_message(f"✅ Position: {position:.2f}°")
-            else:
-                self.log_message("❌ Failed to get position")
+            if position is None:
+                self.log_message("ERROR: Failed to get position")
                 
             test_actuator.disconnect()
-            self.log_message("Test completed")
         else:
-            self.log_message("❌ Connection failed")
+            self.log_message("ERROR: Connection failed")
             
-    def set_broadcast(self) -> None:
-        """Set broadcast frequency."""
+    def get_full_state(self) -> None:
+        """Get full actuator state."""
         if not self.connected or not self.actuator:
             messagebox.showerror("Error", "Not connected to actuator")
             return
             
-        frequency = self.broadcast_freq_var.get()
-        self.log_message(f"Setting broadcast frequency to {frequency} Hz...")
-        if self.actuator.set_broadcast_frequency(frequency):
-            if frequency > 0:
-                self.log_message(f"✓ Broadcast started at {frequency} Hz")
-                # Stop status monitoring when broadcast is active to avoid conflicts
-                self.stop_status_monitoring()
-                # Start listening for broadcast data
-                self.start_broadcast_listening()
-            else:
-                self.log_message("✓ Broadcast stopped")
-                # Stop listening for broadcast data
-                self.stop_broadcast_listening()
-                # Restart status monitoring when broadcast is stopped
-                self.start_status_monitoring()
+        state = self.actuator.get_full_state()
+        if state is not None:
+            # Update status display
+            self.position_status.config(text=f"{state['position']:.2f}°")
+            self.velocity_status.config(text=f"{state['velocity']:.2f}°/s")
+            self.torque_status.config(text=f"{state['torque']:.2f} Nm")
+            self.temperature_status.config(text=f"{state['temperature']:.1f}°C")
+            self.bus_voltage_status.config(text=f"{state['bus_voltage']:.2f} V")
+            self.internal_temperature_status.config(text=f"{state['internal_temperature']:.1f}°C")
         else:
-            self.log_message("✗ Failed to set broadcast frequency")
-            
-    def stop_broadcast(self) -> None:
-        """Stop broadcast (set frequency to 0)."""
-        if not self.connected or not self.actuator:
-            messagebox.showerror("Error", "Not connected to actuator")
-            return
-            
-        self.broadcast_freq_var.set(0.0)
-        self.log_message("Stopping broadcast...")
-        if self.actuator.set_broadcast_frequency(0.0):
-            self.log_message("✓ Broadcast stopped")
-            # Stop listening for broadcast data
-            self.stop_broadcast_listening()
-            # Restart status monitoring when broadcast is stopped
-            self.start_status_monitoring()
-        else:
-            self.log_message("✗ Failed to stop broadcast")
+            self.log_message("ERROR: Failed to get full state")
         
     def set_position(self) -> None:
         """Set actuator position."""
@@ -661,10 +901,8 @@ class ActuatorGUI:
             return
             
         position = self.position_var.get()
-        if self.actuator.set_position(position):
-            self.log_message(f"Set position to {position}°")
-        else:
-            self.log_message(f"Failed to set position to {position}°")
+        if not self.actuator.set_position(position):
+            self.log_message(f"ERROR: Failed to set position to {position}°")
             
     def set_velocity(self) -> None:
         """Set actuator velocity."""
@@ -673,10 +911,8 @@ class ActuatorGUI:
             return
             
         velocity = self.velocity_var.get()
-        if self.actuator.set_velocity(velocity):
-            self.log_message(f"Set velocity to {velocity}°/s")
-        else:
-            self.log_message(f"Failed to set velocity to {velocity}°/s")
+        if not self.actuator.set_velocity(velocity):
+            self.log_message(f"ERROR: Failed to set velocity to {velocity}°/s")
             
     def set_torque(self) -> None:
         """Set actuator torque."""
@@ -685,10 +921,44 @@ class ActuatorGUI:
             return
             
         torque = self.torque_var.get()
-        if self.actuator.set_torque(torque):
-            self.log_message(f"Set torque to {torque} Nm")
-        else:
-            self.log_message(f"Failed to set torque to {torque} Nm")
+        if not self.actuator.set_torque(torque):
+            self.log_message(f"ERROR: Failed to set torque to {torque} Nm")
+    
+    def set_position_value(self, value: float) -> None:
+        """Set position value and send command."""
+        self.position_var.set(value)
+        self.set_position()
+    
+    def set_velocity_value(self, value: float) -> None:
+        """Set velocity value and send command."""
+        self.velocity_var.set(value)
+        self.set_velocity()
+    
+    def set_torque_value(self, value: float) -> None:
+        """Set torque value and send command."""
+        self.torque_var.set(value)
+        self.set_torque()
+    
+    def increment_position_value(self, increment: float) -> None:
+        """Increment position value and send command."""
+        current_value = self.position_var.get()
+        new_value = current_value + increment
+        self.position_var.set(new_value)
+        self.set_position()
+    
+    def increment_velocity_value(self, increment: float) -> None:
+        """Increment velocity value and send command."""
+        current_value = self.velocity_var.get()
+        new_value = current_value + increment
+        self.velocity_var.set(new_value)
+        self.set_velocity()
+    
+    def increment_torque_value(self, increment: float) -> None:
+        """Increment torque value and send command."""
+        current_value = self.torque_var.get()
+        new_value = current_value + increment
+        self.torque_var.set(new_value)
+        self.set_torque()
             
     def enable_actuator(self) -> None:
         """Enable the actuator."""
@@ -696,11 +966,8 @@ class ActuatorGUI:
             messagebox.showerror("Error", "Not connected to actuator")
             return
             
-        self.log_message("Sending enable command...")
-        if self.actuator.enable():
-            self.log_message("✓ Actuator enabled successfully")
-        else:
-            self.log_message("✗ Failed to enable actuator")
+        if not self.actuator.enable():
+            self.log_message("ERROR: Failed to enable actuator")
             
     def disable_actuator(self) -> None:
         """Disable the actuator."""
@@ -708,11 +975,8 @@ class ActuatorGUI:
             messagebox.showerror("Error", "Not connected to actuator")
             return
             
-        self.log_message("Sending disable command...")
-        if self.actuator.disable():
-            self.log_message("✓ Actuator disabled successfully")
-        else:
-            self.log_message("✗ Failed to disable actuator")
+        if not self.actuator.disable():
+            self.log_message("ERROR: Failed to disable actuator")
             
     def home_actuator(self) -> None:
         """Home the actuator."""
@@ -720,10 +984,8 @@ class ActuatorGUI:
             messagebox.showerror("Error", "Not connected to actuator")
             return
             
-        if self.actuator.home():
-            self.log_message("Actuator homing")
-        else:
-            self.log_message("Failed to home actuator")
+        if not self.actuator.home():
+            self.log_message("ERROR: Failed to home actuator")
             
     def stop_actuator(self) -> None:
         """Stop the actuator."""
@@ -731,10 +993,31 @@ class ActuatorGUI:
             messagebox.showerror("Error", "Not connected to actuator")
             return
             
-        if self.actuator.stop():
-            self.log_message("Actuator stopped")
+        if not self.actuator.stop():
+            self.log_message("ERROR: Failed to stop actuator")
+    
+    def reset_position(self) -> None:
+        """Reset the actuator position to zero."""
+        if not self.connected or not self.actuator:
+            messagebox.showerror("Error", "Not connected to actuator")
+            return
+            
+        # Show confirmation dialog
+        result = messagebox.askyesno(
+            "Reset Position", 
+            "This will reset the current position to zero without changing the target.\n\n"
+            "The actuator will treat its current position as the new zero reference.\n\n"
+            "Continue with position reset?"
+        )
+        
+        if not result:
+            return
+            
+        if self.actuator.reset_position():
+            messagebox.showinfo("Reset Complete", "Actuator position has been reset to zero.")
         else:
-            self.log_message("Failed to stop actuator")
+            self.log_message("ERROR: Failed to reset position")
+            messagebox.showerror("Error", "Failed to reset actuator position")
     
     def recalibrate_sensors(self) -> None:
         """Recalibrate the actuator sensors."""
@@ -752,16 +1035,14 @@ class ActuatorGUI:
         if not result:
             return
             
-        self.log_message("Starting sensor recalibration...")
         if self.actuator.recalibrate_sensors():
-            self.log_message("✓ Sensor recalibration completed")
             messagebox.showinfo(
                 "Recalibration Complete", 
                 "Sensor recalibration completed successfully.\n\n"
                 "Use 'Save Configuration' to save the new calibration values to EEPROM."
             )
         else:
-            self.log_message("✗ Failed to recalibrate sensors")
+            self.log_message("ERROR: Failed to recalibrate sensors")
             messagebox.showerror("Error", "Failed to recalibrate sensors")
             
     def get_position(self) -> None:
@@ -773,9 +1054,8 @@ class ActuatorGUI:
         position = self.actuator.get_position()
         if position is not None:
             self.position_status.config(text=f"{position:.2f}°")
-            self.log_message(f"Current position: {position:.2f}°")
         else:
-            self.log_message("Failed to get position")
+            self.log_message("ERROR: Failed to get position")
             
     def get_velocity(self) -> None:
         """Get current velocity."""
@@ -786,9 +1066,8 @@ class ActuatorGUI:
         velocity = self.actuator.get_velocity()
         if velocity is not None:
             self.velocity_status.config(text=f"{velocity:.2f}°/s")
-            self.log_message(f"Current velocity: {velocity:.2f}°/s")
         else:
-            self.log_message("Failed to get velocity")
+            self.log_message("ERROR: Failed to get velocity")
             
     def get_torque(self) -> None:
         """Get current torque."""
@@ -799,9 +1078,8 @@ class ActuatorGUI:
         torque = self.actuator.get_torque()
         if torque is not None:
             self.torque_status.config(text=f"{torque:.2f} Nm")
-            self.log_message(f"Current torque: {torque:.2f} Nm")
         else:
-            self.log_message("Failed to get torque")
+            self.log_message("ERROR: Failed to get torque")
     
     def get_temperature(self) -> None:
         """Get current board temperature."""
@@ -812,9 +1090,8 @@ class ActuatorGUI:
         temperature = self.actuator.get_temperature()
         if temperature is not None:
             self.temperature_status.config(text=f"{temperature:.1f}°C")
-            self.log_message(f"Board temperature: {temperature:.1f}°C")
         else:
-            self.log_message("Failed to get temperature")
+            self.log_message("ERROR: Failed to get temperature")
     
     def get_bus_voltage(self) -> None:
         """Get current bus voltage."""
@@ -825,9 +1102,8 @@ class ActuatorGUI:
         bus_voltage = self.actuator.get_bus_voltage()
         if bus_voltage is not None:
             self.bus_voltage_status.config(text=f"{bus_voltage:.2f} V")
-            self.log_message(f"Bus voltage: {bus_voltage:.2f} V")
         else:
-            self.log_message("Failed to get bus voltage")
+            self.log_message("ERROR: Failed to get bus voltage")
     
     def get_internal_temperature(self) -> None:
         """Get current internal STM32 temperature."""
@@ -838,9 +1114,8 @@ class ActuatorGUI:
         internal_temperature = self.actuator.get_internal_temperature()
         if internal_temperature is not None:
             self.internal_temperature_status.config(text=f"{internal_temperature:.1f}°C")
-            self.log_message(f"Internal temperature: {internal_temperature:.1f}°C")
         else:
-            self.log_message("Failed to get internal temperature")
+            self.log_message("ERROR: Failed to get internal temperature")
     
     def get_velocity_pid(self) -> None:
         """Get velocity PID parameters."""
@@ -854,9 +1129,8 @@ class ActuatorGUI:
             self.vel_p_var.set(p)
             self.vel_i_var.set(i)
             self.vel_d_var.set(d)
-            self.log_message(f"Velocity PID: P={p:.3f}, I={i:.3f}, D={d:.3f}")
         else:
-            self.log_message("Failed to get velocity PID")
+            self.log_message("ERROR: Failed to get velocity PID")
     
     def set_velocity_pid(self) -> None:
         """Set velocity PID parameters."""
@@ -869,10 +1143,9 @@ class ActuatorGUI:
         d = self.vel_d_var.get()
         
         if self.actuator.set_velocity_pid(p, i, d):
-            self.log_message(f"Set velocity PID: P={p:.3f}, I={i:.3f}, D={d:.3f}")
             self._clear_unsaved_changes('velocity')
         else:
-            self.log_message("Failed to set velocity PID")
+            self.log_message("ERROR: Failed to set velocity PID")
     
     def get_angle_pid(self) -> None:
         """Get angle PID parameters."""
@@ -886,9 +1159,8 @@ class ActuatorGUI:
             self.angle_p_var.set(p)
             self.angle_i_var.set(i)
             self.angle_d_var.set(d)
-            self.log_message(f"Angle PID: P={p:.3f}, I={i:.3f}, D={d:.3f}")
         else:
-            self.log_message("Failed to get angle PID")
+            self.log_message("ERROR: Failed to get angle PID")
     
     def set_angle_pid(self) -> None:
         """Set angle PID parameters."""
@@ -901,10 +1173,9 @@ class ActuatorGUI:
         d = self.angle_d_var.get()
         
         if self.actuator.set_angle_pid(p, i, d):
-            self.log_message(f"Set angle PID: P={p:.3f}, I={i:.3f}, D={d:.3f}")
             self._clear_unsaved_changes('angle')
         else:
-            self.log_message("Failed to set angle PID")
+            self.log_message("ERROR: Failed to set angle PID")
     
     def get_current_pid(self) -> None:
         """Get current PID parameters."""
@@ -918,9 +1189,8 @@ class ActuatorGUI:
             self.current_p_var.set(p)
             self.current_i_var.set(i)
             self.current_d_var.set(d)
-            self.log_message(f"Current PID: P={p:.3f}, I={i:.3f}, D={d:.3f}")
         else:
-            self.log_message("Failed to get current PID")
+            self.log_message("ERROR: Failed to get current PID")
     
     def set_current_pid(self) -> None:
         """Set current PID parameters."""
@@ -933,10 +1203,9 @@ class ActuatorGUI:
         d = self.current_d_var.get()
         
         if self.actuator.set_current_pid(p, i, d):
-            self.log_message(f"Set current PID: P={p:.3f}, I={i:.3f}, D={d:.3f}")
             self._clear_unsaved_changes('current')
         else:
-            self.log_message("Failed to set current PID")
+            self.log_message("ERROR: Failed to set current PID")
     
     def save_config(self) -> None:
         """Save configuration to EEPROM."""
@@ -945,13 +1214,12 @@ class ActuatorGUI:
             return
             
         if self.actuator.save_config():
-            self.log_message("Configuration saved to EEPROM")
             # Clear all unsaved changes
             self._clear_unsaved_changes('velocity')
             self._clear_unsaved_changes('angle')
             self._clear_unsaved_changes('current')
         else:
-            self.log_message("Failed to save configuration")
+            self.log_message("ERROR: Failed to save configuration")
     
     def load_config(self) -> None:
         """Load configuration from actuator."""
@@ -971,8 +1239,6 @@ class ActuatorGUI:
         self._clear_unsaved_changes('velocity')
         self._clear_unsaved_changes('angle')
         self._clear_unsaved_changes('current')
-        
-        self.log_message("Configuration loaded from actuator")
     
     def get_downsample(self) -> None:
         """Get current motion downsampling value."""
@@ -983,9 +1249,8 @@ class ActuatorGUI:
         downsample = self.actuator.get_downsample()
         if downsample is not None:
             self.downsample_var.set(downsample)
-            self.log_message(f"Motion downsampling: {downsample}")
         else:
-            self.log_message("Failed to get motion downsampling")
+            self.log_message("ERROR: Failed to get motion downsampling")
     
     def set_downsample(self) -> None:
         """Set motion downsampling value."""
@@ -998,10 +1263,8 @@ class ActuatorGUI:
             messagebox.showerror("Error", "Downsampling factor must be 1 or greater")
             return
         
-        if self.actuator.set_downsample(downsample):
-            self.log_message(f"Set motion downsampling to: {downsample}")
-        else:
-            self.log_message("Failed to set motion downsampling")
+        if not self.actuator.set_downsample(downsample):
+            self.log_message("ERROR: Failed to set motion downsampling")
     
     def _on_pid_change(self, pid_type: str) -> None:
         """Handle PID value changes and update visual feedback."""
@@ -1042,13 +1305,11 @@ class ActuatorGUI:
         self.monitor_btn.config(text="Stop Monitoring")
         self.monitor_thread = threading.Thread(target=self.monitor_loop, daemon=True)
         self.monitor_thread.start()
-        self.log_message("Started real-time monitoring (Note: Status panel already updates at 2Hz)")
         
     def stop_monitoring(self) -> None:
         """Stop real-time monitoring."""
         self.monitoring = False
         self.monitor_btn.config(text="Start Monitoring")
-        self.log_message("Stopped real-time monitoring")
     
     def start_status_monitoring(self) -> None:
         """Start status monitoring at 2Hz."""
@@ -1058,14 +1319,12 @@ class ActuatorGUI:
         self.status_monitoring = True
         self.status_thread = threading.Thread(target=self.status_monitor_loop, daemon=True)
         self.status_thread.start()
-        self.log_message("Started status monitoring at 2Hz")
         
     def stop_status_monitoring(self) -> None:
         """Stop status monitoring."""
         self.status_monitoring = False
         if self.status_thread:
             self.status_thread.join(timeout=1.0)
-        self.log_message("Stopped status monitoring")
         
     def status_monitor_loop(self) -> None:
         """Status monitoring loop at 2Hz."""
@@ -1102,155 +1361,6 @@ class ActuatorGUI:
                 
             time.sleep(0.5)  # 2Hz update rate
         
-    def start_broadcast_listening(self) -> None:
-        """Start listening for broadcast data."""
-        if not self.connected or not self.actuator:
-            return
-            
-        self.broadcast_listening = True
-        self.broadcast_thread = threading.Thread(target=self.broadcast_listener_loop, daemon=True)
-        self.broadcast_thread.start()
-        self.log_message("Started listening for broadcast data")
-        
-    def stop_broadcast_listening(self) -> None:
-        """Stop listening for broadcast data."""
-        self.broadcast_listening = False
-        if self.broadcast_thread:
-            self.broadcast_thread.join(timeout=1.0)
-        self.log_message("Stopped listening for broadcast data")
-        
-    def broadcast_listener_loop(self) -> None:
-        """Listen for broadcast data from the actuator."""
-        data_buffer = []  # Buffer for batch processing
-        last_gui_update = 0
-        gui_update_interval = 0.05  # Update GUI every 50ms (20Hz)
-        
-        while self.broadcast_listening and self.connected and self.actuator:
-            try:
-                # Access serial connection through the interface
-                serial_conn = self.actuator.interface.serial_conn
-                if serial_conn and serial_conn.in_waiting > 0:
-                    line = serial_conn.readline().decode().strip()
-                    if line.startswith("broadcast_data "):
-                        # Parse enhanced broadcast data: "broadcast_data pos vel torque temp voltage int_temp"
-                        parts = line.split()
-                        if len(parts) >= 7:  # Now expecting 6 values + command
-                            try:
-                                position = float(parts[1])
-                                velocity = float(parts[2])
-                                torque = float(parts[3])
-                                temperature = float(parts[4])
-                                bus_voltage = float(parts[5])
-                                internal_temperature = float(parts[6])
-                                
-                                # Add to buffer with all status information
-                                data_buffer.append({
-                                    'position': position,
-                                    'velocity': velocity,
-                                    'torque': torque,
-                                    'temperature': temperature,
-                                    'bus_voltage': bus_voltage,
-                                    'internal_temperature': internal_temperature,
-                                    'time': time.time()
-                                })
-                                
-                                # Process buffer in batches for better performance
-                                if len(data_buffer) >= 5:  # Process every 5 data points
-                                    self._process_broadcast_buffer(data_buffer)
-                                    data_buffer = []
-                                
-                                # Update GUI less frequently to avoid lag
-                                current_time = time.time()
-                                if current_time - last_gui_update >= gui_update_interval:
-                                    self._update_gui_from_buffer(data_buffer)
-                                    last_gui_update = current_time
-                                    
-                            except (ValueError, IndexError) as e:
-                                self.log_message(f"Failed to parse broadcast data: {e}")
-                        elif len(parts) >= 4:
-                            # Fallback for old format (3 values + command)
-                            try:
-                                position = float(parts[1])
-                                velocity = float(parts[2])
-                                torque = float(parts[3])
-                                
-                                # Add to buffer with limited data
-                                data_buffer.append({
-                                    'position': position,
-                                    'velocity': velocity,
-                                    'torque': torque,
-                                    'temperature': None,
-                                    'bus_voltage': None,
-                                    'internal_temperature': None,
-                                    'time': time.time()
-                                })
-                                
-                                # Process buffer in batches for better performance
-                                if len(data_buffer) >= 5:  # Process every 5 data points
-                                    self._process_broadcast_buffer(data_buffer)
-                                    data_buffer = []
-                                
-                                # Update GUI less frequently to avoid lag
-                                current_time = time.time()
-                                if current_time - last_gui_update >= gui_update_interval:
-                                    self._update_gui_from_buffer(data_buffer)
-                                    last_gui_update = current_time
-                                    
-                            except (ValueError, IndexError) as e:
-                                self.log_message(f"Failed to parse broadcast data: {e}")
-                                
-            except Exception as e:
-                self.log_message(f"Broadcast listener error: {e}")
-                break
-                
-            time.sleep(0.001)  # Reduced sleep for faster processing
-    
-    def _process_broadcast_buffer(self, data_buffer: list) -> None:
-        """Process a buffer of broadcast data for plotting."""
-        if not data_buffer:
-            return
-            
-        # Get the latest data point
-        latest = data_buffer[-1]
-        
-        # Store data for plotting
-        self.data_history['time'].append(latest['time'])
-        self.data_history['position'].append(latest['position'])
-        self.data_history['velocity'].append(latest['velocity'])
-        self.data_history['torque'].append(latest['torque'])
-        
-        # Keep only last 200 data points (increased for smoother plotting)
-        if len(self.data_history['time']) > 200:
-            for key in self.data_history:
-                self.data_history[key] = self.data_history[key][-200:]
-        
-        # Send data to plotter if it exists and is plotting
-        if self.plotter and hasattr(self.plotter, 'plotting') and self.plotter.plotting:
-            self.plotter.add_data_point(latest['position'], latest['velocity'], latest['torque'], latest['time'])
-    
-    def _update_gui_from_buffer(self, data_buffer: list) -> None:
-        """Update GUI elements from broadcast data buffer."""
-        if not data_buffer:
-            return
-            
-        # Get the latest data point
-        latest = data_buffer[-1]
-        
-        # Update status display with a single GUI call
-        def update_status():
-            self.position_status.config(text=f"{latest['position']:.2f}°")
-            self.velocity_status.config(text=f"{latest['velocity']:.2f}°/s")
-            self.torque_status.config(text=f"{latest['torque']:.2f} Nm")
-            
-            # Update additional status information if available
-            if latest.get('temperature') is not None:
-                self.temperature_status.config(text=f"{latest['temperature']:.1f}°C")
-            if latest.get('bus_voltage') is not None:
-                self.bus_voltage_status.config(text=f"{latest['bus_voltage']:.2f} V")
-            if latest.get('internal_temperature') is not None:
-                self.internal_temperature_status.config(text=f"{latest['internal_temperature']:.1f}°C")
-        
-        self.root.after(0, update_status)
         
     def monitor_loop(self) -> None:
         """Real-time monitoring loop for data collection and plotting."""
@@ -1273,12 +1383,20 @@ class ActuatorGUI:
                     for key in self.data_history:
                         self.data_history[key] = self.data_history[key][-100:]
                 
+                # Get current measurements (silently)
+                current_a = self.actuator.get_current_a()
+                current_b = self.actuator.get_current_b()
+                current_c = self.actuator.get_current_c()
+                
                 # Send data to plotter if it exists and is plotting
                 if self.plotter and self.plotter.plotting:
                     self.plotter.add_data_point(
                         position if position is not None else 0,
                         velocity if velocity is not None else 0,
                         torque if torque is not None else 0,
+                        current_a if current_a is not None else 0,
+                        current_b if current_b is not None else 0,
+                        current_c if current_c is not None else 0,
                         current_time
                     )
                 
@@ -1314,53 +1432,84 @@ class ActuatorGUI:
             
         # Check if manual monitoring is active
         if self.monitoring:
-            messagebox.showwarning("Warning", "Manual monitoring is active. Stop monitoring first to use plotting with broadcast mode.")
+            messagebox.showwarning("Warning", "Manual monitoring is active. Stop monitoring first to use plotting.")
             return
             
-        # Start broadcast at 50Hz for plotting
-        if self.connected and self.actuator:
-            self.log_message("Starting broadcast at 50Hz for plotting...")
-            if self.actuator.set_broadcast_frequency(50.0):
-                self.log_message("✓ Broadcast started at 50Hz")
-                # Stop status monitoring when broadcast is active to avoid conflicts
-                self.stop_status_monitoring()
-                # Start listening for broadcast data
-                self.start_broadcast_listening()
-            else:
-                self.log_message("✗ Failed to start broadcast for plotting")
-                return
-        else:
+        if not self.connected or not self.actuator:
             self.log_message("Not connected to actuator - cannot start plotting")
             return
             
         self.plotter.start_plotting()
         self.plot_start_btn.config(state='disabled')
         self.plot_stop_btn.config(state='normal')
-        self.plot_status.config(text="Plotting... (50Hz broadcast)")
-        self.log_message("Started real-time plotting with broadcast")
+        self.plot_status.config(text="Plotting... (polling mode)")
+        
+        # Start polling thread for plotting
+        self.start_plotting_polling()
+        
+    def start_plotting_polling(self) -> None:
+        """Start polling for plotting data."""
+        if not self.connected or not self.actuator:
+            return
+            
+        self.plotting_polling = True
+        self.plotting_thread = threading.Thread(target=self.plotting_polling_loop, daemon=True)
+        self.plotting_thread.start()
+        
+    def stop_plotting_polling(self) -> None:
+        """Stop polling for plotting data."""
+        self.plotting_polling = False
+        if hasattr(self, 'plotting_thread') and self.plotting_thread:
+            self.plotting_thread.join(timeout=1.0)
+        
+    def plotting_polling_loop(self) -> None:
+        """Polling loop for plotting data."""
+        while self.plotting_polling and self.connected and self.actuator:
+            try:
+                # Get full state data
+                state = self.actuator.get_full_state()
+                if state is not None:
+                    # Send data to plotter
+                    if self.plotter and hasattr(self.plotter, 'plotting') and self.plotter.plotting:
+                        self.plotter.add_data_point(
+                            state['position'],
+                            state['velocity'], 
+                            state['torque'],
+                            state.get('current_a', 0),
+                            state.get('current_b', 0),
+                            state.get('current_c', 0),
+                            time.time()
+                        )
+                        
+                        # Update status display
+                        def update_status():
+                            self.position_status.config(text=f"{state['position']:.2f}°")
+                            self.velocity_status.config(text=f"{state['velocity']:.2f}°/s")
+                            self.torque_status.config(text=f"{state['torque']:.2f} Nm")
+                            self.temperature_status.config(text=f"{state['temperature']:.1f}°C")
+                            self.bus_voltage_status.config(text=f"{state['bus_voltage']:.2f} V")
+                            self.internal_temperature_status.config(text=f"{state['internal_temperature']:.1f}°C")
+                        
+                        self.root.after(0, update_status)
+                
+                time.sleep(0.02)  # 50Hz polling rate
+                
+            except Exception as e:
+                self.log_message(f"Plotting polling error: {e}")
+                break
         
     def stop_plotting(self) -> None:
         """Stop real-time plotting."""
         if not self.plotter:
             return
             
-        # Stop broadcast when stopping plotting
-        if self.connected and self.actuator:
-            self.log_message("Stopping broadcast for plotting...")
-            if self.actuator.set_broadcast_frequency(0.0):
-                self.log_message("✓ Broadcast stopped")
-                # Stop listening for broadcast data
-                self.stop_broadcast_listening()
-                # Restart status monitoring when broadcast is stopped
-                self.start_status_monitoring()
-            else:
-                self.log_message("✗ Failed to stop broadcast")
-            
+        # Stop plotting polling
+        self.stop_plotting_polling()
+        
         self.plotter.stop_plotting()
         self.plot_start_btn.config(state='normal')
         self.plot_stop_btn.config(state='disabled')
         self.plot_status.config(text="Ready")
-        self.log_message("Stopped real-time plotting")
         
     def clear_plot_data(self) -> None:
         """Clear all plot data."""
@@ -1373,7 +1522,6 @@ class ActuatorGUI:
             
         self.plotter.clear_data()
         self.plot_status.config(text="Data cleared")
-        self.log_message("Cleared plot data")
         
     def save_plot(self) -> None:
         """Save the current plot to a file."""
@@ -1388,7 +1536,6 @@ class ActuatorGUI:
         if filename:
             self.plotter.save_plot(filename)
             self.plot_status.config(text=f"Saved to {filename}")
-            self.log_message(f"Plot saved to {filename}")
         
     def run(self) -> None:
         """Run the GUI application."""

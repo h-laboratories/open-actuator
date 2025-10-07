@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict
 from open_actuator.actuators.Actuator import Actuator
 from open_actuator.interface import USBInterface
 
@@ -151,6 +151,16 @@ class ACBv2(Actuator):
         """
         return self.interface.stop()
 
+    def reset_position(self) -> bool:
+        """
+        Reset the actuator position to zero without changing the target.
+        This sets the current position as the new zero reference.
+        
+        Returns:
+            True if command sent successfully
+        """
+        return self.interface.reset_position()
+
     def get_temperature(self) -> Optional[float]:
         """
         Get current board temperature.
@@ -186,6 +196,33 @@ class ACBv2(Actuator):
         if internal_temperature is not None:
             self._internal_temperature = internal_temperature
         return internal_temperature
+
+    def get_current_a(self) -> Optional[float]:
+        """
+        Get current phase A current.
+        
+        Returns:
+            Current phase A current in Amperes or None if failed
+        """
+        return self.interface.get_current_a()
+
+    def get_current_b(self) -> Optional[float]:
+        """
+        Get current phase B current.
+        
+        Returns:
+            Current phase B current in Amperes or None if failed
+        """
+        return self.interface.get_current_b()
+
+    def get_current_c(self) -> Optional[float]:
+        """
+        Get current phase C current.
+        
+        Returns:
+            Current phase C current in Amperes or None if failed
+        """
+        return self.interface.get_current_c()
 
     def get_velocity_pid(self) -> Optional[Tuple[float, float, float]]:
         """
@@ -310,17 +347,6 @@ class ACBv2(Actuator):
             self._downsample = downsample
         return success
 
-    def set_broadcast_frequency(self, frequency: float) -> bool:
-        """
-        Set the broadcast frequency for position, velocity, and torque data.
-        
-        Args:
-            frequency: Broadcast frequency in Hz (0 to disable broadcast)
-            
-        Returns:
-            True if command sent successfully
-        """
-        return self.interface.set_broadcast_frequency(frequency)
 
     def recalibrate_sensors(self) -> bool:
         """
@@ -330,6 +356,37 @@ class ACBv2(Actuator):
             True if command sent successfully
         """
         return self.interface.recalibrate_sensors()
+
+    def get_pole_pairs(self) -> Optional[int]:
+        """
+        Get current number of pole pairs.
+        
+        Returns:
+            Current number of pole pairs or None if failed
+        """
+        pole_pairs = self.interface.get_pole_pairs()
+        return pole_pairs
+
+    def set_pole_pairs(self, pole_pairs: int) -> bool:
+        """
+        Set number of pole pairs.
+        
+        Args:
+            pole_pairs: Number of pole pairs (1-50)
+            
+        Returns:
+            True if command sent successfully
+        """
+        return self.interface.set_pole_pairs(pole_pairs)
+
+    def get_full_state(self) -> Optional[Dict[str, float]]:
+        """
+        Get full actuator state including position, velocity, torque, and status.
+        
+        Returns:
+            Dictionary with state data or None if failed
+        """
+        return self.interface.get_full_state()
 
     # State access methods
     @property

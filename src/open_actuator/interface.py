@@ -1,7 +1,7 @@
 import serial
 import time
 import struct
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict
 from abc import ABC, abstractmethod
 from enum import IntEnum
 
@@ -18,6 +18,10 @@ class CommandID(IntEnum):
     DISABLE = 0x08
     HOME = 0x09
     STOP = 0x0A
+    RESET_POSITION = 0x0B
+    GET_CURRENT_A = 0x0C
+    GET_CURRENT_B = 0x0D
+    GET_CURRENT_C = 0x0E
     CMD_MODE = 0xAB
     BROADCAST = 0xAC
 
@@ -129,7 +133,6 @@ class USBInterface(Interface):
         Returns:
             True if connection successful, False otherwise
         """
-        print(f"Connecting to {self.port} at {self.baudrate} baud")
         
         try:
             self.serial_conn = serial.Serial(
@@ -139,7 +142,6 @@ class USBInterface(Interface):
             )
             time.sleep(0.1)  # Allow connection to stabilize
             self.connected = True
-            print(f"Connected to {self.port} at {self.baudrate} baud")
             return True
 
         except (serial.SerialException, OSError) as e:
@@ -195,11 +197,9 @@ class USBInterface(Interface):
             Response string or None if failed
         """
         if not self.connected or not self.serial_conn:
-            print(f"[DEBUG] Not connected, cannot send command: {command}")
             return None
             
         try:
-            print(f"[DEBUG] Sending command: '{command}'")
             self.serial_conn.write(f"{command}\n".encode())
             self.serial_conn.flush()  # Ensure data is sent
             
@@ -208,10 +208,8 @@ class USBInterface(Interface):
             
             # Read response with timeout
             response = self.serial_conn.readline().decode().strip()
-            print(f"[DEBUG] Received response: '{response}'")
             return response
         except (serial.SerialException, UnicodeDecodeError) as e:
-            print(f"[DEBUG] Communication error: {e}")
             return None
     
     def _send_binary_command(self, command_id: int, data: bytes = b'') -> Optional[bytes]:
@@ -253,7 +251,6 @@ class USBInterface(Interface):
         """
         if self.command_mode == CommandMode.HUMAN_READABLE:
             response = self._send_human_command("get_position")
-            print(f"[DEBUG] Get position response: '{response}'")
             if response:
                 try:
                     # The firmware responds with "get_position <value>"
@@ -263,7 +260,6 @@ class USBInterface(Interface):
                     else:
                         return float(response)
                 except (ValueError, IndexError) as e:
-                    print(f"[DEBUG] Failed to parse position response: {e}")
                     return None
         else:
             response = self._send_binary_command(CommandID.GET_POSITION)
@@ -281,7 +277,6 @@ class USBInterface(Interface):
         """
         if self.command_mode == CommandMode.HUMAN_READABLE:
             response = self._send_human_command("get_velocity")
-            print(f"[DEBUG] Get velocity response: '{response}'")
             if response:
                 try:
                     # The firmware responds with "get_velocity <value>"
@@ -291,7 +286,6 @@ class USBInterface(Interface):
                     else:
                         return float(response)
                 except (ValueError, IndexError) as e:
-                    print(f"[DEBUG] Failed to parse velocity response: {e}")
                     return None
         else:
             response = self._send_binary_command(CommandID.GET_VELOCITY)
@@ -309,7 +303,6 @@ class USBInterface(Interface):
         """
         if self.command_mode == CommandMode.HUMAN_READABLE:
             response = self._send_human_command("get_torque")
-            print(f"[DEBUG] Get torque response: '{response}'")
             if response:
                 try:
                     # The firmware responds with "get_torque <value>"
@@ -319,7 +312,6 @@ class USBInterface(Interface):
                     else:
                         return float(response)
                 except (ValueError, IndexError) as e:
-                    print(f"[DEBUG] Failed to parse torque response: {e}")
                     return None
         else:
             response = self._send_binary_command(CommandID.GET_TORQUE)
@@ -340,17 +332,14 @@ class USBInterface(Interface):
         """
         if self.command_mode == CommandMode.HUMAN_READABLE:
             response = self._send_human_command(f"set_position {position}")
-            print(f"[DEBUG] Set position response: '{response}'")
             # The firmware responds with "set_position <value>"
             if response and response.startswith("set_position "):
                 try:
                     # Extract the value to verify it was set correctly
                     value_str = response.split(" ", 1)[1]
                     set_value = float(value_str)
-                    print(f"[DEBUG] Position set to: {set_value}")
                     return True
                 except (ValueError, IndexError) as e:
-                    print(f"[DEBUG] Failed to parse set position response: {e}")
                     return False
             return response is not None
         else:
@@ -370,17 +359,14 @@ class USBInterface(Interface):
         """
         if self.command_mode == CommandMode.HUMAN_READABLE:
             response = self._send_human_command(f"set_velocity {velocity}")
-            print(f"[DEBUG] Set velocity response: '{response}'")
             # The firmware responds with "set_velocity <value>"
             if response and response.startswith("set_velocity "):
                 try:
                     # Extract the value to verify it was set correctly
                     value_str = response.split(" ", 1)[1]
                     set_value = float(value_str)
-                    print(f"[DEBUG] Velocity set to: {set_value}")
                     return True
                 except (ValueError, IndexError) as e:
-                    print(f"[DEBUG] Failed to parse set velocity response: {e}")
                     return False
             return response is not None
         else:
@@ -400,17 +386,14 @@ class USBInterface(Interface):
         """
         if self.command_mode == CommandMode.HUMAN_READABLE:
             response = self._send_human_command(f"set_torque {torque}")
-            print(f"[DEBUG] Set torque response: '{response}'")
             # The firmware responds with "set_torque <value>"
             if response and response.startswith("set_torque "):
                 try:
                     # Extract the value to verify it was set correctly
                     value_str = response.split(" ", 1)[1]
                     set_value = float(value_str)
-                    print(f"[DEBUG] Torque set to: {set_value}")
                     return True
                 except (ValueError, IndexError) as e:
-                    print(f"[DEBUG] Failed to parse set torque response: {e}")
                     return False
             return response is not None
         else:
@@ -427,12 +410,10 @@ class USBInterface(Interface):
         """
         if self.command_mode == CommandMode.HUMAN_READABLE:
             response = self._send_human_command("enable")
-            print(f"[DEBUG] Enable response: '{response}'")
             # The firmware responds with "enable" on success
             return response == "enable"
         else:
             response = self._send_binary_command(CommandID.ENABLE)
-            print(f"[DEBUG] Enable binary response: {response}")
             return response is not None
 
     def disable(self) -> bool:
@@ -444,12 +425,10 @@ class USBInterface(Interface):
         """
         if self.command_mode == CommandMode.HUMAN_READABLE:
             response = self._send_human_command("disable")
-            print(f"[DEBUG] Disable response: '{response}'")
             # The firmware responds with "disable" on success
             return response == "disable"
         else:
             response = self._send_binary_command(CommandID.DISABLE)
-            print(f"[DEBUG] Disable binary response: {response}")
             return response is not None
 
     def home(self) -> bool:
@@ -480,6 +459,21 @@ class USBInterface(Interface):
             response = self._send_binary_command(CommandID.STOP)
             return response is not None
 
+    def reset_position(self) -> bool:
+        """
+        Reset the actuator position to zero without changing the target.
+        This sets the current position as the new zero reference.
+        
+        Returns:
+            True if command sent successfully
+        """
+        if self.command_mode == CommandMode.HUMAN_READABLE:
+            response = self._send_human_command("reset_position")
+            return response == "reset_position"
+        else:
+            response = self._send_binary_command(CommandID.RESET_POSITION)
+            return response is not None
+
     def set_command_mode(self, mode: CommandMode) -> bool:
         """
         Set the command communication mode.
@@ -502,36 +496,6 @@ class USBInterface(Interface):
                 self.command_mode = mode
             return response is not None
 
-    def set_broadcast_frequency(self, frequency: float) -> bool:
-        """
-        Set the broadcast frequency for position, velocity, and torque data.
-        
-        Args:
-            frequency: Broadcast frequency in Hz (0 to disable broadcast)
-            
-        Returns:
-            True if command sent successfully
-        """
-        if self.command_mode == CommandMode.HUMAN_READABLE:
-            response = self._send_human_command(f"broadcast {frequency}")
-            print(f"[DEBUG] Set broadcast response: '{response}'")
-            # The firmware should respond with "broadcast <frequency>"
-            if response and response.startswith("broadcast "):
-                try:
-                    # Extract the value to verify it was set correctly
-                    value_str = response.split(" ", 1)[1]
-                    set_value = float(value_str)
-                    print(f"[DEBUG] Broadcast frequency set to: {set_value} Hz")
-                    return True
-                except (ValueError, IndexError) as e:
-                    print(f"[DEBUG] Failed to parse broadcast response: {e}")
-                    return False
-            return response is not None
-        else:
-            data = struct.pack('>h', self._float_to_q88(frequency))
-            response = self._send_binary_command(CommandID.BROADCAST, data)
-            print(f"[DEBUG] Broadcast binary response: {response}")
-            return response is not None
 
     def get_velocity_pid(self) -> Optional[Tuple[float, float, float]]:
         """
@@ -542,7 +506,6 @@ class USBInterface(Interface):
         """
         if self.command_mode == CommandMode.HUMAN_READABLE:
             response = self._send_human_command("get_velocity_pid")
-            print(f"[DEBUG] Get velocity PID response: '{response}'")
             if response and response.startswith("get_velocity_pid "):
                 try:
                     # Parse "get_velocity_pid P I D"
@@ -553,7 +516,7 @@ class USBInterface(Interface):
                         d = float(parts[3])
                         return (p, i, d)
                 except (ValueError, IndexError) as e:
-                    print(f"[DEBUG] Failed to parse velocity PID response: {e}")
+                    ...
             return None
         else:
             # Binary mode not implemented for PID commands yet
@@ -573,7 +536,6 @@ class USBInterface(Interface):
         """
         if self.command_mode == CommandMode.HUMAN_READABLE:
             response = self._send_human_command(f"set_velocity_pid {p} {i} {d}")
-            print(f"[DEBUG] Set velocity PID response: '{response}'")
             if response and response.startswith("set_velocity_pid "):
                 try:
                     # Parse response to verify values were set
@@ -582,10 +544,8 @@ class USBInterface(Interface):
                         set_p = float(parts[1])
                         set_i = float(parts[2])
                         set_d = float(parts[3])
-                        print(f"[DEBUG] Velocity PID set to: P={set_p}, I={set_i}, D={set_d}")
                         return True
                 except (ValueError, IndexError) as e:
-                    print(f"[DEBUG] Failed to parse set velocity PID response: {e}")
                     return False
             return response is not None
         else:
@@ -601,7 +561,6 @@ class USBInterface(Interface):
         """
         if self.command_mode == CommandMode.HUMAN_READABLE:
             response = self._send_human_command("get_angle_pid")
-            print(f"[DEBUG] Get angle PID response: '{response}'")
             if response and response.startswith("get_angle_pid "):
                 try:
                     # Parse "get_angle_pid P I D"
@@ -612,7 +571,7 @@ class USBInterface(Interface):
                         d = float(parts[3])
                         return (p, i, d)
                 except (ValueError, IndexError) as e:
-                    print(f"[DEBUG] Failed to parse angle PID response: {e}")
+                    ...
             return None
         else:
             # Binary mode not implemented for PID commands yet
@@ -632,7 +591,6 @@ class USBInterface(Interface):
         """
         if self.command_mode == CommandMode.HUMAN_READABLE:
             response = self._send_human_command(f"set_angle_pid {p} {i} {d}")
-            print(f"[DEBUG] Set angle PID response: '{response}'")
             if response and response.startswith("set_angle_pid "):
                 try:
                     # Parse response to verify values were set
@@ -641,10 +599,8 @@ class USBInterface(Interface):
                         set_p = float(parts[1])
                         set_i = float(parts[2])
                         set_d = float(parts[3])
-                        print(f"[DEBUG] Angle PID set to: P={set_p}, I={set_i}, D={set_d}")
                         return True
                 except (ValueError, IndexError) as e:
-                    print(f"[DEBUG] Failed to parse set angle PID response: {e}")
                     return False
             return response is not None
         else:
@@ -660,7 +616,6 @@ class USBInterface(Interface):
         """
         if self.command_mode == CommandMode.HUMAN_READABLE:
             response = self._send_human_command("get_current_pid")
-            print(f"[DEBUG] Get current PID response: '{response}'")
             if response and response.startswith("get_current_pid "):
                 try:
                     # Parse "get_current_pid P I D"
@@ -671,7 +626,7 @@ class USBInterface(Interface):
                         d = float(parts[3])
                         return (p, i, d)
                 except (ValueError, IndexError) as e:
-                    print(f"[DEBUG] Failed to parse current PID response: {e}")
+                    ...
             return None
         else:
             # Binary mode not implemented for PID commands yet
@@ -691,7 +646,6 @@ class USBInterface(Interface):
         """
         if self.command_mode == CommandMode.HUMAN_READABLE:
             response = self._send_human_command(f"set_current_pid {p} {i} {d}")
-            print(f"[DEBUG] Set current PID response: '{response}'")
             if response and response.startswith("set_current_pid "):
                 try:
                     # Parse response to verify values were set
@@ -700,10 +654,8 @@ class USBInterface(Interface):
                         set_p = float(parts[1])
                         set_i = float(parts[2])
                         set_d = float(parts[3])
-                        print(f"[DEBUG] Current PID set to: P={set_p}, I={set_i}, D={set_d}")
                         return True
                 except (ValueError, IndexError) as e:
-                    print(f"[DEBUG] Failed to parse set current PID response: {e}")
                     return False
             return response is not None
         else:
@@ -719,7 +671,6 @@ class USBInterface(Interface):
         """
         if self.command_mode == CommandMode.HUMAN_READABLE:
             response = self._send_human_command("save_config")
-            print(f"[DEBUG] Save config response: '{response}'")
             return response == "save_config"
         else:
             # Binary mode not implemented for save_config yet
@@ -734,13 +685,11 @@ class USBInterface(Interface):
         """
         if self.command_mode == CommandMode.HUMAN_READABLE:
             response = self._send_human_command("get_downsample")
-            print(f"[DEBUG] Get downsample response: '{response}'")
             if response and response.startswith("get_downsample "):
                 try:
                     value_str = response.split(" ", 1)[1]
                     return int(value_str)
                 except (ValueError, IndexError) as e:
-                    print(f"[DEBUG] Failed to parse downsample response: {e}")
                     return None
             return None
         else:
@@ -759,15 +708,12 @@ class USBInterface(Interface):
         """
         if self.command_mode == CommandMode.HUMAN_READABLE:
             response = self._send_human_command(f"set_downsample {downsample}")
-            print(f"[DEBUG] Set downsample response: '{response}'")
             if response and response.startswith("set_downsample "):
                 try:
                     value_str = response.split(" ", 1)[1]
                     set_value = int(value_str)
-                    print(f"[DEBUG] Downsample set to: {set_value}")
                     return True
                 except (ValueError, IndexError) as e:
-                    print(f"[DEBUG] Failed to parse set downsample response: {e}")
                     return False
             return response is not None
         else:
@@ -783,13 +729,11 @@ class USBInterface(Interface):
         """
         if self.command_mode == CommandMode.HUMAN_READABLE:
             response = self._send_human_command("get_temperature")
-            print(f"[DEBUG] Get temperature response: '{response}'")
             if response and response.startswith("get_temperature "):
                 try:
                     value_str = response.split(" ", 1)[1]
                     return float(value_str)
                 except (ValueError, IndexError) as e:
-                    print(f"[DEBUG] Failed to parse temperature response: {e}")
                     return None
             return None
         else:
@@ -805,13 +749,11 @@ class USBInterface(Interface):
         """
         if self.command_mode == CommandMode.HUMAN_READABLE:
             response = self._send_human_command("get_bus_voltage")
-            print(f"[DEBUG] Get bus voltage response: '{response}'")
             if response and response.startswith("get_bus_voltage "):
                 try:
                     value_str = response.split(" ", 1)[1]
                     return float(value_str)
                 except (ValueError, IndexError) as e:
-                    print(f"[DEBUG] Failed to parse bus voltage response: {e}")
                     return None
             return None
         else:
@@ -827,17 +769,84 @@ class USBInterface(Interface):
         """
         if self.command_mode == CommandMode.HUMAN_READABLE:
             response = self._send_human_command("get_internal_temperature")
-            print(f"[DEBUG] Get internal temperature response: '{response}'")
             if response and response.startswith("get_internal_temperature "):
                 try:
                     value_str = response.split(" ", 1)[1]
                     return float(value_str)
                 except (ValueError, IndexError) as e:
-                    print(f"[DEBUG] Failed to parse internal temperature response: {e}")
                     return None
             return None
         else:
             # Binary mode not implemented for internal temperature commands yet
+            return None
+
+    def get_current_a(self) -> Optional[float]:
+        """
+        Get current phase A current.
+        
+        Returns:
+            Current phase A current in Amperes or None if failed
+        """
+        if self.command_mode == CommandMode.HUMAN_READABLE:
+            response = self._send_human_command("get_current_a")
+            if response and response.startswith("get_current_a "):
+                try:
+                    value_str = response.split(" ", 1)[1]
+                    return float(value_str)
+                except (ValueError, IndexError) as e:
+                    return None
+            return None
+        else:
+            response = self._send_binary_command(CommandID.GET_CURRENT_A)
+            if response and len(response) >= 4:
+                value = struct.unpack('>f', response[:4])[0]
+                return value
+            return None
+
+    def get_current_b(self) -> Optional[float]:
+        """
+        Get current phase B current.
+        
+        Returns:
+            Current phase B current in Amperes or None if failed
+        """
+        if self.command_mode == CommandMode.HUMAN_READABLE:
+            response = self._send_human_command("get_current_b")
+            if response and response.startswith("get_current_b "):
+                try:
+                    value_str = response.split(" ", 1)[1]
+                    return float(value_str)
+                except (ValueError, IndexError) as e:
+                    return None
+            return None
+        else:
+            response = self._send_binary_command(CommandID.GET_CURRENT_B)
+            if response and len(response) >= 4:
+                value = struct.unpack('>f', response[:4])[0]
+                return value
+            return None
+
+    def get_current_c(self) -> Optional[float]:
+        """
+        Get current phase C current.
+        
+        Returns:
+            Current phase C current in Amperes or None if failed
+        """
+        if self.command_mode == CommandMode.HUMAN_READABLE:
+            response = self._send_human_command("get_current_c")
+            if response and response.startswith("get_current_c "):
+                try:
+                    value_str = response.split(" ", 1)[1]
+                    return float(value_str)
+                except (ValueError, IndexError) as e:
+                    return None
+            return None
+        else:
+            response = self._send_binary_command(CommandID.GET_CURRENT_C)
+            if response and len(response) >= 4:
+                value = struct.unpack('>f', response[:4])[0]
+                return value
             return None
 
     def recalibrate_sensors(self) -> bool:
@@ -849,13 +858,89 @@ class USBInterface(Interface):
         """
         if self.command_mode == CommandMode.HUMAN_READABLE:
             response = self._send_human_command("recalibrate_sensors")
-            print(f"[DEBUG] Recalibrate sensors response: '{response}'")
             # The firmware responds with multiple lines during calibration
             # We consider it successful if we get any response
             return response is not None
         else:
             # Binary mode not implemented for recalibrate_sensors yet
             return False
+
+    def get_pole_pairs(self) -> Optional[int]:
+        """
+        Get current number of pole pairs.
+        
+        Returns:
+            Current number of pole pairs or None if failed
+        """
+        if self.command_mode == CommandMode.HUMAN_READABLE:
+            response = self._send_human_command("get_pole_pairs")
+            if response and response.startswith("get_pole_pairs "):
+                try:
+                    value_str = response.split(" ", 1)[1]
+                    return int(value_str)
+                except (ValueError, IndexError) as e:
+                    return None
+            return None
+        else:
+            # Binary mode not implemented for pole pairs commands yet
+            return None
+
+    def set_pole_pairs(self, pole_pairs: int) -> bool:
+        """
+        Set number of pole pairs.
+        
+        Args:
+            pole_pairs: Number of pole pairs (1-50)
+            
+        Returns:
+            True if command sent successfully
+        """
+        if self.command_mode == CommandMode.HUMAN_READABLE:
+            response = self._send_human_command(f"set_pole_pairs {pole_pairs}")
+            if response and response.startswith("set_pole_pairs "):
+                try:
+                    # Parse response to verify value was set
+                    value_str = response.split(" ", 1)[1]
+                    set_value = int(value_str)
+                    return True
+                except (ValueError, IndexError) as e:
+                    return False
+            return response is not None
+        else:
+            # Binary mode not implemented for pole pairs commands yet
+            return False
+
+    def get_full_state(self) -> Optional[Dict[str, float]]:
+        """
+        Get full actuator state including position, velocity, torque, and status.
+        
+        Returns:
+            Dictionary with state data or None if failed
+        """
+        if self.command_mode == CommandMode.HUMAN_READABLE:
+            response = self._send_human_command("get_full_state")
+            if response and response.startswith("full_state "):
+                try:
+                    # Parse "full_state pos vel torque temp voltage int_temp current_a current_b current_c"
+                    parts = response.split()
+                    if len(parts) >= 10:
+                        return {
+                            'position': float(parts[1]),
+                            'velocity': float(parts[2]),
+                            'torque': float(parts[3]),
+                            'temperature': float(parts[4]),
+                            'bus_voltage': float(parts[5]),
+                            'internal_temperature': float(parts[6]),
+                            'current_a': float(parts[7]),
+                            'current_b': float(parts[8]),
+                            'current_c': float(parts[9])
+                        }
+                except (ValueError, IndexError) as e:
+                    ...
+            return None
+        else:
+            # Binary mode not implemented for get_full_state yet
+            return None
 
 
 class SerialInterface(Interface):

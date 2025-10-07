@@ -38,7 +38,10 @@ class ActuatorPlotter:
             'time': [],
             'position': [],
             'velocity': [],
-            'torque': []
+            'torque': [],
+            'current_a': [],
+            'current_b': [],
+            'current_c': []
         }
         self.plotting = False
         self.plot_thread: Optional[threading.Thread] = None
@@ -57,19 +60,23 @@ class ActuatorPlotter:
             'time': [],
             'position': [],
             'velocity': [],
-            'torque': []
+            'torque': [],
+            'current_a': [],
+            'current_b': [],
+            'current_c': []
         }
         
     def setup_plot(self) -> None:
         """Set up the matplotlib plot."""
         # Create figure with subplots and increased spacing
-        self.fig = Figure(figsize=(12, 8), dpi=100)
+        self.fig = Figure(figsize=(12, 10), dpi=100)
         self.fig.suptitle('Actuator Real-time Data', fontsize=14, fontweight='bold')
         
-        # Create subplots with increased spacing
-        self.ax_position = self.fig.add_subplot(3, 1, 1)
-        self.ax_velocity = self.fig.add_subplot(3, 1, 2)
-        self.ax_torque = self.fig.add_subplot(3, 1, 3)
+        # Create subplots with increased spacing (2 rows, 2 columns)
+        self.ax_position = self.fig.add_subplot(2, 2, 1)
+        self.ax_velocity = self.fig.add_subplot(2, 2, 2)
+        self.ax_torque = self.fig.add_subplot(2, 2, 3)
+        self.ax_currents = self.fig.add_subplot(2, 2, 4)
         
         # Adjust subplot spacing to prevent overlap
         self.fig.subplots_adjust(hspace=0.4)
@@ -87,9 +94,14 @@ class ActuatorPlotter:
         
         self.ax_torque.set_title('Torque (Newton-meters)')
         self.ax_torque.set_ylabel('Torque (Nm)')
-        self.ax_torque.set_xlabel('Time (seconds)')
         self.ax_torque.set_xlim(-self.window_duration, 0)  # Fixed time window
         self.ax_torque.grid(True, alpha=0.3)
+        
+        self.ax_currents.set_title('Three-Phase Currents')
+        self.ax_currents.set_ylabel('Current (A)')
+        self.ax_currents.set_xlabel('Time (seconds)')
+        self.ax_currents.set_xlim(-self.window_duration, 0)  # Fixed time window
+        self.ax_currents.grid(True, alpha=0.3)
         
         # Create canvas
         self.canvas = FigureCanvasTkAgg(self.fig, self.parent)
@@ -99,13 +111,19 @@ class ActuatorPlotter:
         self.position_line, = self.ax_position.plot([], [], 'b-', linewidth=2, label='Position')
         self.velocity_line, = self.ax_velocity.plot([], [], 'g-', linewidth=2, label='Velocity')
         self.torque_line, = self.ax_torque.plot([], [], 'r-', linewidth=2, label='Torque')
+        self.current_a_line, = self.ax_currents.plot([], [], 'm-', linewidth=2, label='Phase A')
+        self.current_b_line, = self.ax_currents.plot([], [], 'c-', linewidth=2, label='Phase B')
+        self.current_c_line, = self.ax_currents.plot([], [], 'y-', linewidth=2, label='Phase C')
         
         # Add legends
         self.ax_position.legend()
         self.ax_velocity.legend()
         self.ax_torque.legend()
+        self.ax_currents.legend()
         
-    def add_data_point(self, position: float, velocity: float, torque: float, timestamp: Optional[float] = None) -> None:
+    def add_data_point(self, position: float, velocity: float, torque: float, 
+                      current_a: float = 0.0, current_b: float = 0.0, current_c: float = 0.0,
+                      timestamp: Optional[float] = None) -> None:
         """
         Add a new data point to the plot.
         
@@ -113,6 +131,9 @@ class ActuatorPlotter:
             position: Position value in degrees
             velocity: Velocity value in degrees/second
             torque: Torque value in Newton-meters
+            current_a: Phase A current in Amperes
+            current_b: Phase B current in Amperes
+            current_c: Phase C current in Amperes
             timestamp: Broadcast timestamp (if None, uses current time)
         """
         if timestamp is None:
@@ -126,6 +147,9 @@ class ActuatorPlotter:
         self.data_history['position'].append(position)
         self.data_history['velocity'].append(velocity)
         self.data_history['torque'].append(torque)
+        self.data_history['current_a'].append(current_a)
+        self.data_history['current_b'].append(current_b)
+        self.data_history['current_c'].append(current_c)
         
         # Maintain fixed window - remove data older than window_duration
         cutoff_time = timestamp - self.window_duration
@@ -188,6 +212,13 @@ class ActuatorPlotter:
         self.ax_torque.relim()
         self.ax_torque.autoscale_view()
         
+        # Update current plots (all on same subplot)
+        self.current_a_line.set_data(relative_time, self.data_history['current_a'])
+        self.current_b_line.set_data(relative_time, self.data_history['current_b'])
+        self.current_c_line.set_data(relative_time, self.data_history['current_c'])
+        self.ax_currents.relim()
+        self.ax_currents.autoscale_view()
+        
         # Redraw canvas (use draw() for faster updates)
         self.canvas.draw()
         
@@ -200,6 +231,9 @@ class ActuatorPlotter:
         self.position_line.set_data([], [])
         self.velocity_line.set_data([], [])
         self.torque_line.set_data([], [])
+        self.current_a_line.set_data([], [])
+        self.current_b_line.set_data([], [])
+        self.current_c_line.set_data([], [])
         
         # Redraw
         self.canvas.draw()

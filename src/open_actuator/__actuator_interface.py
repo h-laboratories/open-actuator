@@ -135,7 +135,6 @@ class ActuatorInterface:
             return None
             
         try:
-            print(f"[DEBUG] Sending command: '{command}'")
             self.serial_conn.write(f"{command}\n".encode())
             self.serial_conn.flush()  # Ensure data is sent
             
@@ -144,7 +143,6 @@ class ActuatorInterface:
             
             # Read response with timeout
             response = self.serial_conn.readline().decode().strip()
-            print(f"[DEBUG] Received response: '{response}'")
             return response
         except (serial.SerialException, UnicodeDecodeError) as e:
             print(f"[DEBUG] Communication error: {e}")
