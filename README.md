@@ -22,7 +22,7 @@ A comprehensive control software for actuators with a modern GUI interface. This
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone [<repository-url>](https://github.com/h-laboratories/open-actuator.git)
 cd open-actuator
 ```
 
