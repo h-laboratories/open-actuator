@@ -1,6 +1,6 @@
 from typing import Optional, Tuple, Dict
 from open_actuator.actuators.Actuator import Actuator
-from open_actuator.interface import USBInterface
+from open_actuator.interface import USBInterface, TorqueControlType, FOCModulationType
 
 
 class ACBv2(Actuator):
@@ -36,6 +36,10 @@ class ACBv2(Actuator):
         
         # Configuration
         self._downsample: Optional[int] = None
+        self._min_angle: Optional[float] = None
+        self._max_angle: Optional[float] = None
+        self._torque_controller: Optional[TorqueControlType] = None
+        self._foc_modulation: Optional[FOCModulationType] = None
 
     def get_position(self) -> Optional[float]:
         """
@@ -388,6 +392,114 @@ class ACBv2(Actuator):
         """
         return self.interface.get_full_state()
 
+    def get_min_angle(self) -> Optional[float]:
+        """
+        Get minimum allowed angle.
+        
+        Returns:
+            Current minimum angle in degrees or None if failed
+        """
+        min_angle = self.interface.get_min_angle()
+        if min_angle is not None:
+            self._min_angle = min_angle
+        return min_angle
+
+    def set_min_angle(self, min_angle: float) -> bool:
+        """
+        Set minimum allowed angle.
+        
+        Args:
+            min_angle: Minimum angle in degrees
+            
+        Returns:
+            True if command sent successfully
+        """
+        success = self.interface.set_min_angle(min_angle)
+        if success:
+            self._min_angle = min_angle
+        return success
+
+    def get_max_angle(self) -> Optional[float]:
+        """
+        Get maximum allowed angle.
+        
+        Returns:
+            Current maximum angle in degrees or None if failed
+        """
+        max_angle = self.interface.get_max_angle()
+        if max_angle is not None:
+            self._max_angle = max_angle
+        return max_angle
+
+    def set_max_angle(self, max_angle: float) -> bool:
+        """
+        Set maximum allowed angle.
+        
+        Args:
+            max_angle: Maximum angle in degrees
+            
+        Returns:
+            True if command sent successfully
+        """
+        success = self.interface.set_max_angle(max_angle)
+        if success:
+            self._max_angle = max_angle
+        return success
+
+    def get_torque_controller(self) -> Optional[TorqueControlType]:
+        """
+        Get current torque controller type.
+        
+        Returns:
+            Current torque controller type or None if failed
+        """
+        controller_type = self.interface.get_torque_controller()
+        if controller_type is not None:
+            self._torque_controller = controller_type
+        return controller_type
+
+    def set_torque_controller(self, controller_type: TorqueControlType) -> bool:
+        """
+        Set torque controller type.
+        
+        Args:
+            controller_type: Torque controller type enum
+            
+        Returns:
+            True if command sent successfully
+        """
+        success = self.interface.set_torque_controller(controller_type)
+        if success:
+            self._torque_controller = controller_type
+        return success
+
+    def get_foc_modulation(self) -> Optional[FOCModulationType]:
+        """
+        Get current FOC modulation type.
+        
+        Returns:
+            Current FOC modulation type or None if failed
+        """
+        modulation_type = self.interface.get_foc_modulation()
+        if modulation_type is not None:
+            self._foc_modulation = modulation_type
+        return modulation_type
+
+    def set_foc_modulation(self, modulation_type: FOCModulationType) -> bool:
+        """
+        Set FOC modulation type.
+        
+        Args:
+            modulation_type: FOC modulation type enum
+            
+        Returns:
+            True if command sent successfully
+        """
+        success = self.interface.set_foc_modulation(modulation_type)
+        if success:
+            self._foc_modulation = modulation_type
+        return success
+
     # State access methods
     @property
     def position(self) -> Optional[float]:
@@ -443,3 +555,23 @@ class ACBv2(Actuator):
     def downsample(self) -> Optional[int]:
         """Get cached downsample value."""
         return self._downsample
+
+    @property
+    def min_angle(self) -> Optional[float]:
+        """Get cached minimum angle value."""
+        return self._min_angle
+
+    @property
+    def max_angle(self) -> Optional[float]:
+        """Get cached maximum angle value."""
+        return self._max_angle
+
+    @property
+    def torque_controller(self) -> Optional[TorqueControlType]:
+        """Get cached torque controller type."""
+        return self._torque_controller
+
+    @property
+    def foc_modulation(self) -> Optional[FOCModulationType]:
+        """Get cached FOC modulation type."""
+        return self._foc_modulation
