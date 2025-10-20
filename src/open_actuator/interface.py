@@ -33,6 +33,21 @@ class CommandMode(IntEnum):
     SIMPLEFOC = 3
 
 
+class TorqueControlType(IntEnum):
+    """Torque control types."""
+    VOLTAGE = 0
+    DC_CURRENT = 1
+    FOC_CURRENT = 2
+
+
+class FOCModulationType(IntEnum):
+    """FOC modulation types."""
+    SINE_PWM = 0
+    SPACE_VECTOR_PWM = 1
+    TRAPEZOID_120 = 2
+    TRAPEZOID_150 = 3
+
+
 class Interface(ABC):
     """Abstract base class for actuator interfaces."""
     
@@ -99,6 +114,46 @@ class Interface(ABC):
     @abstractmethod
     def stop(self) -> bool:
         """Stop the actuator."""
+        pass
+
+    @abstractmethod
+    def get_min_angle(self) -> Optional[float]:
+        """Get minimum allowed angle."""
+        pass
+
+    @abstractmethod
+    def set_min_angle(self, min_angle: float) -> bool:
+        """Set minimum allowed angle."""
+        pass
+
+    @abstractmethod
+    def get_max_angle(self) -> Optional[float]:
+        """Get maximum allowed angle."""
+        pass
+
+    @abstractmethod
+    def set_max_angle(self, max_angle: float) -> bool:
+        """Set maximum allowed angle."""
+        pass
+
+    @abstractmethod
+    def get_torque_controller(self) -> Optional[TorqueControlType]:
+        """Get current torque controller type."""
+        pass
+
+    @abstractmethod
+    def set_torque_controller(self, controller_type: TorqueControlType) -> bool:
+        """Set torque controller type."""
+        pass
+
+    @abstractmethod
+    def get_foc_modulation(self) -> Optional[FOCModulationType]:
+        """Get current FOC modulation type."""
+        pass
+
+    @abstractmethod
+    def set_foc_modulation(self, modulation_type: FOCModulationType) -> bool:
+        """Set FOC modulation type."""
         pass
 
 
@@ -186,7 +241,7 @@ class USBInterface(Interface):
             value = value - 0x10000
         return value / 256.0
     
-    def _send_human_command(self, command: str) -> Optional[str]:
+    def _send_human_command(self, command: str, timeout: float = 5.0) -> Optional[str]:
         """
         Send human-readable command and get response.
         
@@ -203,12 +258,17 @@ class USBInterface(Interface):
             self.serial_conn.write(f"{command}\n".encode())
             self.serial_conn.flush()  # Ensure data is sent
             
-            # Wait a bit for response
-            time.sleep(0.1)
-            
-            # Read response with timeout
-            response = self.serial_conn.readline().decode().strip()
-            return response
+            while True:
+                if self.serial_conn.in_waiting:
+
+                    response = self.serial_conn.readline().decode().strip()
+                    return response
+                time.sleep(0.1)
+                timeout -= 0.1
+                if timeout <= 0:
+                    return None
+        except TimeoutError:
+            return None
         except (serial.SerialException, UnicodeDecodeError) as e:
             return None
     
@@ -671,10 +731,14 @@ class USBInterface(Interface):
         """
         if self.command_mode == CommandMode.HUMAN_READABLE:
             response = self._send_human_command("save_config")
-            return response == "save_config"
+            res =  response == "save_config"
+            if not res:
+                print(f"[DEBUG] Save config response: '{response}'")
+            return res
         else:
             # Binary mode not implemented for save_config yet
             return False
+        return False
 
     def get_downsample(self) -> Optional[int]:
         """
@@ -941,6 +1005,197 @@ class USBInterface(Interface):
         else:
             # Binary mode not implemented for get_full_state yet
             return None
+
+    def get_min_angle(self) -> Optional[float]:
+        """
+        Get minimum allowed angle.
+        
+        Returns:
+            Current minimum angle in degrees or None if failed
+        """
+        if self.command_mode == CommandMode.HUMAN_READABLE:
+            response = self._send_human_command("get_min_angle")
+            if response and response.startswith("get_min_angle "):
+                try:
+                    value_str = response.split(" ", 1)[1]
+                    return float(value_str)
+                except (ValueError, IndexError) as e:
+                    return None
+            return None
+        else:
+            # Binary mode not implemented for min_angle commands yet
+            return None
+
+    def set_min_angle(self, min_angle: float) -> bool:
+        """
+        Set minimum allowed angle.
+        
+        Args:
+            min_angle: Minimum angle in degrees
+            
+        Returns:
+            True if command sent successfully
+        """
+        if self.command_mode == CommandMode.HUMAN_READABLE:
+            response = self._send_human_command(f"set_min_angle {min_angle}")
+            if response and response.startswith("set_min_angle "):
+                try:
+                    # Parse response to verify value was set
+                    value_str = response.split(" ", 1)[1]
+                    set_value = float(value_str)
+                    return True
+                except (ValueError, IndexError) as e:
+                    return False
+            return response is not None
+        else:
+            # Binary mode not implemented for min_angle commands yet
+            return False
+
+    def get_max_angle(self) -> Optional[float]:
+        """
+        Get maximum allowed angle.
+        
+        Returns:
+            Current maximum angle in degrees or None if failed
+        """
+        if self.command_mode == CommandMode.HUMAN_READABLE:
+            response = self._send_human_command("get_max_angle")
+            if response and response.startswith("get_max_angle "):
+                try:
+                    value_str = response.split(" ", 1)[1]
+                    return float(value_str)
+                except (ValueError, IndexError) as e:
+                    return None
+            return None
+        else:
+            # Binary mode not implemented for max_angle commands yet
+            return None
+
+    def set_max_angle(self, max_angle: float) -> bool:
+        """
+        Set maximum allowed angle.
+        
+        Args:
+            max_angle: Maximum angle in degrees
+            
+        Returns:
+            True if command sent successfully
+        """
+        if self.command_mode == CommandMode.HUMAN_READABLE:
+            response = self._send_human_command(f"set_max_angle {max_angle}")
+            if response and response.startswith("set_max_angle "):
+                try:
+                    # Parse response to verify value was set
+                    value_str = response.split(" ", 1)[1]
+                    set_value = float(value_str)
+                    return True
+                except (ValueError, IndexError) as e:
+                    return False
+            return response is not None
+        else:
+            # Binary mode not implemented for max_angle commands yet
+            return False
+
+    def get_torque_controller(self) -> Optional[TorqueControlType]:
+        """
+        Get current torque controller type.
+        
+        Returns:
+            Current torque controller type or None if failed
+        """
+        if self.command_mode == CommandMode.HUMAN_READABLE:
+            response = self._send_human_command("get_torque_controller")
+            if response and response.startswith("get_torque_controller "):
+                try:
+                    value_str = response.split(" ", 1)[1]
+                    # Convert numeric value to enum
+                    controller_type = int(value_str)
+                    if controller_type in [TorqueControlType.VOLTAGE, TorqueControlType.DC_CURRENT, TorqueControlType.FOC_CURRENT]:
+                        return TorqueControlType(controller_type)
+                    else:
+                        return None
+                except (ValueError, IndexError) as e:
+                    return None
+            return None
+        else:
+            # Binary mode not implemented for torque_controller commands yet
+            return None
+
+    def set_torque_controller(self, controller_type: TorqueControlType) -> bool:
+        """
+        Set torque controller type.
+        
+        Args:
+            controller_type: Torque controller type enum
+            
+        Returns:
+            True if command sent successfully
+        """
+        if self.command_mode == CommandMode.HUMAN_READABLE:
+            response = self._send_human_command(f"set_torque_controller {controller_type.value}")
+            if response and response.startswith("set_torque_controller "):
+                try:
+                    # Parse response to verify value was set
+                    value_str = response.split(" ", 1)[1]
+                    set_value = int(value_str)
+                    return True
+                except (ValueError, IndexError) as e:
+                    return False
+            return response is not None
+        else:
+            # Binary mode not implemented for torque_controller commands yet
+            return False
+
+    def get_foc_modulation(self) -> Optional[FOCModulationType]:
+        """
+        Get current FOC modulation type.
+        
+        Returns:
+            Current FOC modulation type or None if failed
+        """
+        if self.command_mode == CommandMode.HUMAN_READABLE:
+            response = self._send_human_command("get_foc_modulation")
+            if response and response.startswith("get_foc_modulation "):
+                try:
+                    value_str = response.split(" ", 1)[1]
+                    # Convert numeric value to enum
+                    modulation_type = int(value_str)
+                    if modulation_type in [FOCModulationType.SINE_PWM, FOCModulationType.SPACE_VECTOR_PWM, 
+                                         FOCModulationType.TRAPEZOID_120, FOCModulationType.TRAPEZOID_150]:
+                        return FOCModulationType(modulation_type)
+                    else:
+                        return None
+                except (ValueError, IndexError) as e:
+                    return None
+            return None
+        else:
+            # Binary mode not implemented for foc_modulation commands yet
+            return None
+
+    def set_foc_modulation(self, modulation_type: FOCModulationType) -> bool:
+        """
+        Set FOC modulation type.
+        
+        Args:
+            modulation_type: FOC modulation type enum
+            
+        Returns:
+            True if command sent successfully
+        """
+        if self.command_mode == CommandMode.HUMAN_READABLE:
+            response = self._send_human_command(f"set_foc_modulation {modulation_type.value}")
+            if response and response.startswith("set_foc_modulation "):
+                try:
+                    # Parse response to verify value was set
+                    value_str = response.split(" ", 1)[1]
+                    set_value = int(value_str)
+                    return True
+                except (ValueError, IndexError) as e:
+                    return False
+            return response is not None
+        else:
+            # Binary mode not implemented for foc_modulation commands yet
+            return False
 
 
 class SerialInterface(Interface):
